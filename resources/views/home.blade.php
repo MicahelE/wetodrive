@@ -185,13 +185,35 @@
 
         @auth
             <div class="user-info" style="display: flex; justify-content: space-between; align-items: center;">
-                <p><strong>Connected as:</strong> {{ Auth::user()->name }} ({{ Auth::user()->email }})</p>
-                <form method="POST" action="{{ route('auth.disconnect') }}" style="display: inline;">
-                    @csrf
-                    <button type="submit" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
-                        Disconnect
-                    </button>
-                </form>
+                <div>
+                    <p><strong>Connected as:</strong> {{ Auth::user()->name }} ({{ Auth::user()->email }})</p>
+                    <p style="margin-top: 5px; font-size: 0.9rem;">
+                        <strong>Plan:</strong> {{ ucfirst(Auth::user()->subscription_tier) }}
+                        @if(Auth::user()->hasActiveSubscription())
+                            @php
+                                $subscription = Auth::user()->activeSubscription;
+                            @endphp
+                            • {{ $subscription->getRemainingTransfers() === null ? 'Unlimited' : $subscription->getRemainingTransfers() }} transfers remaining
+                        @else
+                            • Free plan (5 transfers/month)
+                        @endif
+                    </p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <a href="{{ route('subscription.pricing') }}" style="background: #4285f4; color: white; border: none; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 0.9rem;">
+                        @if(Auth::user()->subscription_tier === 'free')
+                            Upgrade
+                        @else
+                            Manage
+                        @endif
+                    </a>
+                    <form method="POST" action="{{ route('auth.disconnect') }}" style="display: inline;">
+                        @csrf
+                        <button type="submit" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+                            Disconnect
+                        </button>
+                    </form>
+                </div>
             </div>
 
             <form method="POST" action="{{ route('transfer') }}" class="transfer-form">

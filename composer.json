@@ -11,7 +11,9 @@
         "google/apiclient": "^2.18",
         "laravel/framework": "^12.0",
         "laravel/socialite": "^5.23",
-        "laravel/tinker": "^2.10.1"
+        "laravel/tinker": "^2.10.1",
+        "lemonsqueezy/laravel": "^1.8",
+        "yabacon/paystack-php": "^2.2"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

@@ -20,6 +20,8 @@ class TransferController extends Controller
 
     public function transfer(Request $request)
     {
+        set_time_limit(300);
+
         $request->validate([
             'wetransfer_url' => 'required|url'
         ]);
@@ -27,6 +29,21 @@ class TransferController extends Controller
         if (!Auth::check()) {
             Log::warning('Transfer attempted without Google Drive authentication');
             return redirect()->back()->with('error', 'Please connect to Google Drive first.');
+        }
+
+        $user = Auth::user();
+
+        // Check subscription limits
+        if (!$this->checkTransferLimits($user)) {
+            Log::warning('Transfer attempted but user exceeded limits', [
+                'user_id' => $user->id,
+                'subscription_tier' => $user->subscription_tier
+            ]);
+
+            return redirect()->back()->with('error',
+                'You have reached your transfer limit for this month. ' .
+                '<a href="' . route('subscription.pricing') . '" style="color: #4285f4; text-decoration: underline;">Upgrade your plan</a> to continue transferring files.'
+            );
         }
 
         try {
@@ -37,21 +54,46 @@ class TransferController extends Controller
             Log::info('Parsed download URL', ['download_url' => $downloadUrl]);
             
             $fileInfo = $this->downloadFile($downloadUrl);
-            Log::info('File downloaded', [
+            Log::info('File downloaded to disk', [
                 'filename' => $fileInfo['filename'],
-                'size' => strlen($fileInfo['content']),
-                'mimeType' => $fileInfo['mimeType']
+                'size' => $fileInfo['size'],
+                'mimeType' => $fileInfo['mimeType'],
+                'temp_file' => $fileInfo['temp_file']
             ]);
-            
-            $this->uploadToGoogleDrive($fileInfo, Auth::user());
+
+            // Validate file size against subscription limits
+            if (!$this->checkFileSizeLimit($user, $fileInfo['size'])) {
+                // Cleanup temp file
+                if (file_exists($fileInfo['temp_file'])) {
+                    unlink($fileInfo['temp_file']);
+                }
+
+                $maxSize = $this->getMaxFileSizeForUser($user);
+                return redirect()->back()->with('error',
+                    'File size (' . $this->formatFileSize($fileInfo['size']) . ') exceeds your plan limit of ' . $this->formatFileSize($maxSize) . '. ' .
+                    '<a href="' . route('subscription.pricing') . '" style="color: #4285f4; text-decoration: underline;">Upgrade your plan</a> for larger files.'
+                );
+            }
+
+            $this->uploadToGoogleDrive($fileInfo, $user);
             Log::info('File uploaded to Google Drive successfully', ['filename' => $fileInfo['filename']]);
-            
+
+            // Increment transfer count after successful upload
+            $user->incrementTransferCount();
+
             return redirect()->back()->with('success', 'File transferred to Google Drive successfully!');
         } catch (\Exception $e) {
             Log::error('Transfer failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+            
+            // Cleanup any temp files that might have been created
+            if (isset($fileInfo['temp_file']) && file_exists($fileInfo['temp_file'])) {
+                unlink($fileInfo['temp_file']);
+                Log::info('Cleaned up temp file after error', ['temp_file' => $fileInfo['temp_file']]);
+            }
+            
             return redirect()->back()->with('error', 'Transfer failed: ' . $e->getMessage());
         }
     }
@@ -279,22 +321,33 @@ class TransferController extends Controller
             Log::info('Got direct download link', ['direct_url' => $url]);
         }
         
+        // Create temp file path
+        $tempDir = storage_path('temp');
+        $tempFile = $tempDir . '/' . uniqid('wetransfer_', true) . '.tmp';
+        
+        // Ensure temp directory exists
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        }
+        
+        Log::info('Downloading to temp file', ['temp_file' => $tempFile]);
+        
         $client = new Client([
             'headers' => [
                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             ],
             'allow_redirects' => true,
-            'timeout' => 300, // 5 minutes timeout for large files
+            'timeout' => 0, // No timeout for streaming downloads
+            'read_timeout' => 0,
+            'connect_timeout' => 30
         ]);
         
         try {
-            $response = $client->get($url);
+            // First, get headers to extract filename and validate response
+            $headResponse = $client->head($url);
             
-            $statusCode = $response->getStatusCode();
-            Log::info('Download response received', ['status_code' => $statusCode]);
-            
-            $contentType = $response->getHeader('content-type')[0] ?? 'application/octet-stream';
-            $contentLength = $response->getHeader('content-length')[0] ?? 'unknown';
+            $contentType = $headResponse->getHeader('content-type')[0] ?? 'application/octet-stream';
+            $contentLength = $headResponse->getHeader('content-length')[0] ?? 'unknown';
             
             Log::info('Response headers', [
                 'content_type' => $contentType,
@@ -303,28 +356,52 @@ class TransferController extends Controller
             
             // Check if we got HTML instead of a file
             if (strpos($contentType, 'text/html') !== false) {
-                Log::error('Received HTML instead of file', [
-                    'content_type' => $contentType,
-                    'body_preview' => substr($response->getBody()->getContents(), 0, 500)
-                ]);
-                throw new \Exception('Downloaded content appears to be a webpage instead of a file. The download link may have expired or be invalid.');
+                Log::error('Received HTML content type', ['content_type' => $contentType]);
+                throw new \Exception('Download link appears to return a webpage instead of a file. The link may have expired or be invalid.');
             }
             
-            $contentDisposition = $response->getHeader('content-disposition')[0] ?? '';
-            preg_match('/filename="(.+)"/', $contentDisposition, $matches);
-            $filename = $matches[1] ?? 'downloaded_file';
+            $contentDisposition = $headResponse->getHeader('content-disposition')[0] ?? '';
+            preg_match('/filename[^;=\n]*=(([\'"]).*?\2|[^;\n]*)/', $contentDisposition, $matches);
+            $filename = isset($matches[1]) ? trim($matches[1], '"\'') : 'downloaded_file';
             
             Log::info('Extracted filename', ['filename' => $filename]);
             
-            $content = $response->getBody()->getContents();
-            Log::info('File content downloaded', ['size_bytes' => strlen($content)]);
+            // Now stream the actual file download
+            $resource = fopen($tempFile, 'w');
+            if (!$resource) {
+                throw new \Exception('Could not create temporary file for download');
+            }
+            
+            Log::info('Starting streaming download', ['expected_size' => $contentLength]);
+            
+            $response = $client->get($url, [
+                'sink' => $resource
+            ]);
+            
+            fclose($resource);
+            
+            $actualSize = filesize($tempFile);
+            Log::info('File streamed to disk', ['size_bytes' => $actualSize, 'temp_file' => $tempFile]);
+            
+            // Validate download completed successfully
+            if ($contentLength !== 'unknown' && $actualSize != intval($contentLength)) {
+                unlink($tempFile); // Cleanup incomplete file
+                throw new \Exception("Download incomplete. Expected {$contentLength} bytes, got {$actualSize} bytes.");
+            }
             
             return [
-                'content' => $content,
+                'temp_file' => $tempFile,
                 'filename' => $filename,
-                'mimeType' => $contentType
+                'mimeType' => $contentType,
+                'size' => $actualSize
             ];
+            
         } catch (\Exception $e) {
+            // Cleanup temp file on error
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+            
             Log::error('File download failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -335,9 +412,19 @@ class TransferController extends Controller
 
     private function uploadToGoogleDrive($fileInfo, $user)
     {
-        Log::info('Starting Google Drive upload', ['filename' => $fileInfo['filename']]);
+        Log::info('Starting Google Drive upload', [
+            'filename' => $fileInfo['filename'],
+            'size' => $fileInfo['size'],
+            'temp_file' => $fileInfo['temp_file']
+        ]);
+        
+        $tempFile = $fileInfo['temp_file'];
         
         try {
+            if (!file_exists($tempFile)) {
+                throw new \Exception('Temporary file not found: ' . $tempFile);
+            }
+            
             $client = new Google_Client();
             
             // Configure the client with OAuth credentials
@@ -398,17 +485,59 @@ class TransferController extends Controller
                 'name' => $fileInfo['filename']
             ]);
             
-            Log::info('Uploading to Google Drive', [
+            Log::info('Uploading to Google Drive from disk', [
                 'filename' => $fileInfo['filename'],
-                'size' => strlen($fileInfo['content']),
+                'size' => $fileInfo['size'],
                 'mimeType' => $fileInfo['mimeType']
             ]);
-
-            $result = $service->files->create($fileMetadata, [
-                'data' => $fileInfo['content'],
-                'mimeType' => $fileInfo['mimeType'],
-                'uploadType' => 'multipart'
-            ]);
+            
+            // For large files, use resumable upload
+            if ($fileInfo['size'] > 5 * 1024 * 1024) { // > 5MB
+                Log::info('Using resumable upload for large file');
+                
+                // Enable resumable upload
+                $client->setDefer(true);
+                
+                $request = $service->files->create($fileMetadata, [
+                    'mimeType' => $fileInfo['mimeType'],
+                    'uploadType' => 'resumable'
+                ]);
+                
+                // Create media upload
+                $media = new \Google_Http_MediaFileUpload(
+                    $client,
+                    $request,
+                    $fileInfo['mimeType'],
+                    null,
+                    true,
+                    1024 * 1024 // 1MB chunks
+                );
+                $media->setFileSize($fileInfo['size']);
+                
+                // Upload file in chunks
+                $status = false;
+                $handle = fopen($tempFile, "rb");
+                
+                while (!$status && !feof($handle)) {
+                    $chunk = fread($handle, 1024 * 1024); // 1MB chunks
+                    $status = $media->nextChunk($chunk);
+                }
+                
+                fclose($handle);
+                $client->setDefer(false);
+                
+                $result = $status;
+                
+            } else {
+                // For smaller files, use simple upload
+                Log::info('Using simple upload for small file');
+                
+                $result = $service->files->create($fileMetadata, [
+                    'data' => file_get_contents($tempFile),
+                    'mimeType' => $fileInfo['mimeType'],
+                    'uploadType' => 'multipart'
+                ]);
+            }
             
             Log::info('Google Drive upload successful', [
                 'file_id' => $result->id,
@@ -421,6 +550,52 @@ class TransferController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
             throw $e;
+        } finally {
+            // Always cleanup the temp file
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+                Log::info('Cleaned up temp file', ['temp_file' => $tempFile]);
+            }
         }
+    }
+
+    private function checkTransferLimits($user): bool
+    {
+        // For paid subscriptions, check via subscription model
+        if ($user->hasActiveSubscription()) {
+            return $user->activeSubscription->canMakeTransfer();
+        }
+
+        // Free tier: simplified check - allow up to 5 total transfers
+        // In a real app, you'd want to track monthly transfers properly
+        return $user->total_transfers < 5;
+    }
+
+    private function checkFileSizeLimit($user, int $fileSize): bool
+    {
+        $maxSize = $this->getMaxFileSizeForUser($user);
+        return $fileSize <= $maxSize;
+    }
+
+    private function getMaxFileSizeForUser($user): int
+    {
+        if ($user->hasActiveSubscription()) {
+            return $user->activeSubscription->subscriptionPlan->max_file_size;
+        }
+
+        // Free tier: 100MB
+        return 100 * 1024 * 1024;
+    }
+
+    private function formatFileSize(int $bytes): string
+    {
+        if ($bytes >= 1024 * 1024 * 1024) {
+            return round($bytes / (1024 * 1024 * 1024), 1) . 'GB';
+        } elseif ($bytes >= 1024 * 1024) {
+            return round($bytes / (1024 * 1024), 1) . 'MB';
+        } elseif ($bytes >= 1024) {
+            return round($bytes / 1024, 1) . 'KB';
+        }
+        return $bytes . ' bytes';
     }
 }
