@@ -109,6 +109,13 @@ class UserSubscription extends Model
         ]);
     }
 
+    public function getFormattedAmount(): string
+    {
+        return $this->currency === 'NGN'
+            ? '₦' . number_format($this->amount_paid, 0)
+            : '$' . number_format($this->amount_paid, 2);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');

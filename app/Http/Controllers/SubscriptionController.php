@@ -120,9 +120,110 @@ class SubscriptionController extends Controller
 
     public function lemonSqueezySuccess(Request $request)
     {
-        // LemonSqueezy will redirect here after successful payment
-        // The actual processing happens via webhook, so we just show success message
-        return redirect()->route('home')->with('success', 'Payment completed! Your subscription will be activated shortly.');
+        $user = Auth::user();
+        
+        if (!$user) {
+            return redirect()->route('home')->with('error', 'Please login to view your subscription.');
+        }
+
+        // Get checkout data from session
+        $checkoutData = session('lemon_squeezy_checkout');
+        
+        if (!$checkoutData) {
+            Log::warning('LemonSqueezy success callback called without session data', [
+                'user_id' => $user->id,
+                'query_params' => $request->all()
+            ]);
+            return redirect()->route('home')->with('error', 'Session expired. Please try again.');
+        }
+
+        // Verify this checkout belongs to the current user
+        if ($checkoutData['user_id'] != $user->id) {
+            Log::warning('LemonSqueezy success callback user mismatch', [
+                'session_user_id' => $checkoutData['user_id'],
+                'current_user_id' => $user->id
+            ]);
+            return redirect()->route('home')->with('error', 'Invalid session.');
+        }
+
+        try {
+            // Get the transaction to find the order
+            $transaction = \App\Models\PaymentTransaction::find($checkoutData['transaction_id']);
+            
+            if (!$transaction) {
+                Log::error('LemonSqueezy transaction not found', [
+                    'transaction_id' => $checkoutData['transaction_id']
+                ]);
+                return redirect()->route('home')->with('error', 'Transaction not found.');
+            }
+
+            // Get the plan
+            $plan = \App\Models\SubscriptionPlan::find($checkoutData['plan_id']);
+            
+            if (!$plan) {
+                Log::error('LemonSqueezy plan not found', [
+                    'plan_id' => $checkoutData['plan_id']
+                ]);
+                return redirect()->route('home')->with('error', 'Plan not found.');
+            }
+
+            // Check if subscription already exists
+            $existingSubscription = $user->activeSubscription;
+            
+            if ($existingSubscription && $existingSubscription->subscription_plan_id == $plan->id) {
+                // Subscription already active
+                session()->forget('lemon_squeezy_checkout');
+                return redirect()->route('home')->with('success', 'Your subscription is already active!');
+            }
+
+            // Create subscription directly (webhook will handle if it hasn't already)
+            $subscription = \App\Models\UserSubscription::create([
+                'user_id' => $user->id,
+                'subscription_plan_id' => $plan->id,
+                'payment_provider' => 'lemonsqueezy',
+                'provider_subscription_id' => 'pending_' . time(),
+                'status' => 'active',
+                'started_at' => now(),
+                'expires_at' => now()->addMonth(),
+                'transfers_used' => 0,
+                'period_resets_at' => now()->addMonth(),
+                'amount_paid' => $plan->price_usd,
+                'currency' => 'USD',
+                'metadata' => ['created_via' => 'success_callback'],
+            ]);
+
+            // Update transaction
+            $transaction->update([
+                'status' => 'success',
+                'user_subscription_id' => $subscription->id
+            ]);
+
+            // Update user
+            $user->update([
+                'subscription_tier' => $plan->slug,
+                'active_subscription_id' => $subscription->id,
+            ]);
+
+            // Clear session
+            session()->forget('lemon_squeezy_checkout');
+
+            Log::info('LemonSqueezy subscription activated via success callback', [
+                'user_id' => $user->id,
+                'subscription_id' => $subscription->id,
+                'plan' => $plan->name
+            ]);
+
+            return redirect()->route('home')->with('success', 'Subscription activated successfully! You can now enjoy your new plan.');
+
+        } catch (\Exception $e) {
+            Log::error('LemonSqueezy success callback error', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->route('home')->with('error', 'Payment processing failed. Please contact support.');
+        }
     }
 
     public function manage(Request $request)

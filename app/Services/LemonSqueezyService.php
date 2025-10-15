@@ -27,56 +27,53 @@ class LemonSqueezyService
                 'currency' => 'USD',
             ]);
 
-            // Create checkout session using LemonSqueezy
-            $checkout = LemonSqueezy::api()->post('/checkouts', [
-                'data' => [
-                    'type' => 'checkouts',
-                    'attributes' => [
-                        'checkout_data' => [
-                            'email' => $user->email,
-                            'name' => $user->name,
-                            'custom' => [
-                                'user_id' => $user->id,
-                                'plan_id' => $plan->id,
-                                'transaction_id' => $transaction->id,
-                                'reference' => $reference,
-                            ]
-                        ]
-                    ],
-                    'relationships' => [
-                        'store' => [
-                            'data' => [
-                                'type' => 'stores',
-                                'id' => config('lemon-squeezy.store_id')
-                            ]
-                        ],
-                        'variant' => [
-                            'data' => [
-                                'type' => 'variants',
-                                'id' => $this->getVariantIdForPlan($plan)
-                            ]
-                        ]
-                    ]
+            // Get variant ID for the plan
+            $variantId = $this->getVariantIdForPlan($plan);
+            
+            if (!$variantId) {
+                throw new \Exception('No variant ID configured for plan: ' . $plan->slug);
+            }
+
+            // Create checkout using LemonSqueezy Checkout class
+            $checkout = \LemonSqueezy\Laravel\Checkout::make(
+                config('lemon-squeezy.store_id'),
+                $variantId
+            )
+            ->withName($user->name)
+            ->withEmail($user->email)
+            ->redirectTo(route('lemonsqueezy.success'))
+            ->withCustomData([
+                'user_id' => (string) $user->id,
+                'plan_id' => (string) $plan->id,
+                'transaction_id' => (string) $transaction->id,
+                'reference' => $reference,
+            ]);
+
+            // Get checkout URL
+            $checkoutUrl = $checkout->url();
+
+            // Store checkout reference in session for later retrieval
+            session([
+                'lemon_squeezy_checkout' => [
+                    'user_id' => $user->id,
+                    'plan_id' => $plan->id,
+                    'transaction_id' => $transaction->id,
+                    'reference' => $reference,
                 ]
             ]);
 
-            if (isset($checkout['data']['attributes']['url'])) {
-                Log::info('LemonSqueezy checkout created', [
-                    'user_id' => $user->id,
-                    'plan_id' => $plan->id,
-                    'reference' => $reference,
-                    'checkout_id' => $checkout['data']['id']
-                ]);
+            Log::info('LemonSqueezy checkout created', [
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'reference' => $reference,
+                'checkout_url' => $checkoutUrl
+            ]);
 
-                return [
-                    'success' => true,
-                    'checkout_url' => $checkout['data']['attributes']['url'],
-                    'checkout_id' => $checkout['data']['id'],
-                    'reference' => $reference,
-                ];
-            }
-
-            throw new \Exception('Failed to create LemonSqueezy checkout');
+            return [
+                'success' => true,
+                'checkout_url' => $checkoutUrl,
+                'reference' => $reference,
+            ];
 
         } catch (\Exception $e) {
             Log::error('LemonSqueezy checkout creation failed', [
@@ -104,10 +101,45 @@ class LemonSqueezyService
         return $variants[$plan->slug] ?? '';
     }
 
+    public function verifyOrder(string $orderId): array
+    {
+        try {
+            $response = LemonSqueezy::api('get', "orders/{$orderId}");
+            
+            if (isset($response['data'])) {
+                return [
+                    'success' => true,
+                    'data' => $response['data']
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Order not found'
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('LemonSqueezy order verification failed', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+
     public function handleSuccessfulPayment(array $orderData): bool
     {
         try {
-            $customData = $orderData['attributes']['first_order_item']['product_options']['custom'] ?? [];
+            // Try multiple locations for custom data
+            $customData = 
+                $orderData['attributes']['first_order_item']['product_options']['custom'] ?? 
+                $orderData['attributes']['checkout_data']['custom'] ?? 
+                $orderData['attributes']['custom'] ?? 
+                [];
 
             $userId = $customData['user_id'] ?? null;
             $planId = $customData['plan_id'] ?? null;
@@ -116,7 +148,8 @@ class LemonSqueezyService
             if (!$userId || !$planId || !$transactionId) {
                 Log::error('LemonSqueezy: Invalid order data', [
                     'order_id' => $orderData['id'],
-                    'custom_data' => $customData
+                    'custom_data' => $customData,
+                    'order_attributes' => $orderData['attributes'] ?? null
                 ]);
                 return false;
             }
@@ -132,6 +165,19 @@ class LemonSqueezyService
                     'transaction_id' => $transactionId
                 ]);
                 return false;
+            }
+
+            // Check if subscription already exists for this order
+            $existingSubscription = UserSubscription::where('provider_subscription_id', $orderData['id'])
+                ->where('payment_provider', 'lemonsqueezy')
+                ->first();
+
+            if ($existingSubscription) {
+                Log::info('LemonSqueezy: Subscription already exists for this order', [
+                    'order_id' => $orderData['id'],
+                    'subscription_id' => $existingSubscription->id
+                ]);
+                return true;
             }
 
             // Mark transaction as successful
@@ -203,7 +249,7 @@ class LemonSqueezyService
     {
         try {
             // Create product in LemonSqueezy
-            $product = LemonSqueezy::api()->post('/products', [
+            $product = LemonSqueezy::api('post', 'products', [
                 'data' => [
                     'type' => 'products',
                     'attributes' => [
@@ -216,16 +262,16 @@ class LemonSqueezyService
                         'store' => [
                             'data' => [
                                 'type' => 'stores',
-                                'id' => config('lemon-squeezy.store_id')
+                                'id' => (string) config('lemon-squeezy.store_id')
                             ]
                         ]
                     ]
                 ]
             ]);
 
-            if (isset($product['data']['id'])) {
+            if ($product->json('data.id') !== null) {
                 // Create variant (pricing option)
-                $variant = LemonSqueezy::api()->post('/variants', [
+                $variant = LemonSqueezy::api('post', 'variants', [
                     'data' => [
                         'type' => 'variants',
                         'attributes' => [
@@ -237,7 +283,7 @@ class LemonSqueezyService
                             'product' => [
                                 'data' => [
                                     'type' => 'products',
-                                    'id' => $product['data']['id']
+                                    'id' => (string) $product->json('data.id')
                                 ]
                             ]
                         ]
@@ -252,9 +298,9 @@ class LemonSqueezyService
 
                 return [
                     'success' => true,
-                    'product_id' => $product['data']['id'],
-                    'variant_id' => $variant['data']['id'] ?? null,
-                    'data' => $product['data']
+                    'product_id' => $product->json('data.id'),
+                    'variant_id' => $variant->json('data.id'),
+                    'data' => $product->json('data')
                 ];
             }
 
@@ -387,17 +433,17 @@ class LemonSqueezyService
             }
 
             // Cancel subscription via LemonSqueezy API
-            $response = LemonSqueezy::api()->patch("/subscriptions/{$subscription->provider_subscription_id}", [
+            $response = LemonSqueezy::api('patch', "subscriptions/{$subscription->provider_subscription_id}", [
                 'data' => [
                     'type' => 'subscriptions',
-                    'id' => $subscription->provider_subscription_id,
+                    'id' => (string) $subscription->provider_subscription_id,
                     'attributes' => [
                         'cancelled' => true
                     ]
                 ]
             ]);
 
-            if (isset($response['data'])) {
+            if ($response->json('data') !== null) {
                 $subscription->cancel();
 
                 Log::info('LemonSqueezy subscription cancelled via API', [

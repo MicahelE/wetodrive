@@ -7,7 +7,7 @@ use App\Models\User;
 use App\Models\UserSubscription;
 use App\Models\PaymentTransaction;
 use Illuminate\Support\Facades\Log;
-use Yabacon\Paystack\Paystack;
+use Yabacon\Paystack;
 
 class PaystackService
 {
