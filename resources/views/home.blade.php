@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WetoDrive - WeTransfer to Google Drive</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ asset('favicon.svg') }}">
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
+    <meta name="theme-color" content="#4285f4">
     <style>
         * {
             margin: 0;
@@ -296,6 +301,17 @@
             border: 1px solid #f5c6cb;
         }
         
+        .alert a {
+            color: #155724;
+            text-decoration: underline;
+            font-weight: 600;
+        }
+        
+        .alert a:hover {
+            color: #0c3e1a;
+            text-decoration: none;
+        }
+        
         .user-info {
             background: #e8f5e8;
             padding: 20px;
@@ -555,7 +571,7 @@
             <div class="container">
                 @if(session('success'))
                     <div class="alert alert-success">
-                        {{ session('success') }}
+                        {!! session('success') !!}
                     </div>
                 @endif
 

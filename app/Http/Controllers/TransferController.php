@@ -75,13 +75,20 @@ class TransferController extends Controller
                 );
             }
 
-            $this->uploadToGoogleDrive($fileInfo, $user);
-            Log::info('File uploaded to Google Drive successfully', ['filename' => $fileInfo['filename']]);
+            $googleDriveFileId = $this->uploadToGoogleDrive($fileInfo, $user);
+            Log::info('File uploaded to Google Drive successfully', [
+                'filename' => $fileInfo['filename'],
+                'file_id' => $googleDriveFileId
+            ]);
 
             // Increment transfer count after successful upload
             $user->incrementTransferCount();
 
-            return redirect()->back()->with('success', 'File transferred to Google Drive successfully!');
+            $googleDriveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
+            $successMessage = 'File transferred to Google Drive successfully! ' .
+                '<a href="' . $googleDriveUrl . '" target="_blank" style="color: #4285f4; text-decoration: underline; font-weight: 600;">📁 View in Google Drive</a>';
+
+            return redirect()->back()->with('success', $successMessage);
         } catch (\Exception $e) {
             Log::error('Transfer failed', [
                 'error' => $e->getMessage(),
@@ -543,6 +550,8 @@ class TransferController extends Controller
                 'file_id' => $result->id,
                 'filename' => $result->name
             ]);
+            
+            return $result->id;
             
         } catch (\Exception $e) {
             Log::error('Google Drive upload failed', [
