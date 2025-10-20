@@ -27,6 +27,16 @@ class SubscriptionController extends Controller
         $userCountry = $this->geoLocationService->getUserCountry($request, $user);
         $paymentProvider = $this->geoLocationService->getPaymentProvider($request, $user);
 
+        // Log location detection for debugging
+        Log::info('Location Detection Debug', [
+            'user_id' => $user?->id,
+            'user_country' => $userCountry,
+            'payment_provider' => $paymentProvider,
+            'user_agent' => $request->userAgent(),
+            'ip_address' => $request->ip(),
+            'country_name' => $userCountry === 'NG' ? 'Nigeria' : 'International'
+        ]);
+
         // Update user's country if not set
         if ($user && !$user->country_code) {
             $user->update(['country_code' => $userCountry]);

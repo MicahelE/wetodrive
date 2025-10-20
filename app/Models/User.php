@@ -21,6 +21,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
         'google_id',
         'google_token',
         'google_refresh_token',
@@ -121,5 +122,20 @@ class User extends Authenticatable
     public function getPreferredPaymentProvider(): string
     {
         return $this->isFromNigeria() ? 'paystack' : 'lemonsqueezy';
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function makeAdmin(): void
+    {
+        $this->update(['role' => 'admin']);
+    }
+
+    public function removeAdmin(): void
+    {
+        $this->update(['role' => 'user']);
     }
 }

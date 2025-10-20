@@ -202,14 +202,6 @@
             opacity: 0.9;
         }
 
-        .location-info {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 30px;
-            text-align: center;
-            color: white;
-        }
 
         .pricing-grid {
             display: grid;
@@ -383,14 +375,18 @@
             <div class="nav-links">
                 <a href="{{ route('subscription.pricing') }}">Pricing</a>
                 @auth
-                    <a href="{{ route('user.dashboard') }}">Dashboard</a>
+                    @if(Auth::user()->isAdmin())
+                        <a href="{{ route('admin.dashboard') }}">Admin Dashboard</a>
+                    @else
+                        <a href="{{ route('subscription.manage') }}">Dashboard</a>
+                    @endif
                 @endauth
             </div>
 
             <div class="user-menu">
                 @auth
                     <div class="user-avatar">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div>
-                    <form method="POST" action="{{ route('auth.logout') }}" style="margin: 0;">
+                    <form method="POST" action="{{ route('auth.disconnect') }}" style="margin: 0;">
                         @csrf
                         <button type="submit" style="background: none; border: none; color: #333; font-weight: 500; cursor: pointer;">Sign Out</button>
                     </form>
@@ -417,8 +413,12 @@
             <a href="{{ route('home') }}">Home</a>
             <a href="{{ route('subscription.pricing') }}">Pricing</a>
             @auth
-                <a href="{{ route('user.dashboard') }}">Dashboard</a>
-                <form method="POST" action="{{ route('auth.logout') }}" style="margin: 0;">
+                @if(Auth::user()->isAdmin())
+                    <a href="{{ route('admin.dashboard') }}">Admin Dashboard</a>
+                @else
+                    <a href="{{ route('subscription.manage') }}">Dashboard</a>
+                @endif
+                <form method="POST" action="{{ route('auth.disconnect') }}" style="margin: 0;">
                     @csrf
                     <button type="submit" style="background: none; border: none; color: #333; font-weight: 500; padding: 15px 0; border-bottom: 1px solid #f0f0f0; width: 100%; text-align: left; cursor: pointer;">Sign Out</button>
                 </form>
@@ -458,12 +458,6 @@
             </div>
         @endif
 
-        <div class="location-info">
-            <p>
-                📍 Detected location: {{ $userCountry === 'NG' ? 'Nigeria' : 'International' }} |
-                Payment via: {{ $paymentProvider === 'paystack' ? 'Paystack' : 'LemonSqueezy' }}
-            </p>
-        </div>
 
         <div class="pricing-grid">
             @foreach($plans as $plan)
@@ -571,6 +565,14 @@
             if (e.key === 'Escape') {
                 closeMobileMenu();
             }
+        });
+
+        // Debug location detection
+        console.log('Location Detection Debug:', {
+            userCountry: '{{ $userCountry }}',
+            paymentProvider: '{{ $paymentProvider }}',
+            countryName: '{{ $userCountry === 'NG' ? 'Nigeria' : 'International' }}',
+            paymentService: '{{ $paymentProvider === 'paystack' ? 'Paystack' : 'LemonSqueezy' }}'
         });
     </script>
 </body>

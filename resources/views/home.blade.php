@@ -493,8 +493,12 @@
         <div class="mobile-nav-links">
             @auth
                 <a href="{{ route('subscription.pricing') }}">Pricing</a>
-                <a href="{{ route('user.dashboard') }}">Dashboard</a>
-                <form method="POST" action="{{ route('auth.logout') }}" style="margin: 0;">
+                @if(Auth::user()->isAdmin())
+                    <a href="{{ route('admin.dashboard') }}">Admin Dashboard</a>
+                @else
+                    <a href="{{ route('subscription.manage') }}">Dashboard</a>
+                @endif
+                <form method="POST" action="{{ route('auth.disconnect') }}" style="margin: 0;">
                     @csrf
                     <button type="submit" style="background: none; border: none; color: #333; font-weight: 500; padding: 15px 0; border-bottom: 1px solid #f0f0f0; width: 100%; text-align: left; cursor: pointer;">Sign Out</button>
                 </form>

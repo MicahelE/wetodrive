@@ -1,2 +1,17 @@
 User-agent: *
-Disallow:
+Allow: /
+
+# Sitemap
+Sitemap: https://wetodrive.com/sitemap.xml
+
+# Disallow admin areas
+Disallow: /admin/
+Disallow: /webhooks/
+Disallow: /auth/google/callback
+Disallow: /paystack/callback
+Disallow: /lemonsqueezy/success
+
+# Allow public pages
+Allow: /
+Allow: /pricing
+Allow: /auth/google

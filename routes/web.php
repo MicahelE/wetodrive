@@ -4,9 +4,20 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\AdminController;
 
 Route::get('/', [TransferController::class, 'index'])->name('home');
 Route::post('/transfer', [TransferController::class, 'transfer'])->name('transfer');
+
+// Sitemap route
+Route::get('/sitemap.xml', function () {
+    return response()->file(public_path('sitemap.xml'));
+})->name('sitemap');
+
+// Robots.txt route
+Route::get('/robots.txt', function () {
+    return response()->file(public_path('robots.txt'));
+})->name('robots');
 
 Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
@@ -26,3 +37,15 @@ Route::get('/lemonsqueezy/success', [SubscriptionController::class, 'lemonSqueez
 // Webhooks (no middleware - external providers)
 Route::post('/webhooks/paystack', [SubscriptionController::class, 'paystackWebhook'])->name('webhooks.paystack');
 Route::post('/webhooks/lemonsqueezy', [SubscriptionController::class, 'lemonSqueezyWebhook'])->name('webhooks.lemonsqueezy');
+
+// Admin routes
+Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+    Route::get('/users', [AdminController::class, 'users'])->name('users');
+    Route::get('/users/{user}', [AdminController::class, 'userDetail'])->name('users.detail');
+    Route::post('/users/{user}/make-admin', [AdminController::class, 'makeAdmin'])->name('users.make-admin');
+    Route::post('/users/{user}/remove-admin', [AdminController::class, 'removeAdmin'])->name('users.remove-admin');
+    Route::get('/subscriptions', [AdminController::class, 'subscriptions'])->name('subscriptions');
+    Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');
+    Route::get('/analytics', [AdminController::class, 'analytics'])->name('analytics');
+});
