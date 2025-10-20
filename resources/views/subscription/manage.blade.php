@@ -10,6 +10,16 @@
     <link rel="apple-touch-icon" href="{{ asset('favicon.svg') }}">
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <meta name="theme-color" content="#4285f4">
+    
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-174D73GPWB"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-174D73GPWB');
+    </script>
+    
     <style>
         * {
             margin: 0;

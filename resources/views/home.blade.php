@@ -10,6 +10,34 @@
     <link rel="apple-touch-icon" href="{{ asset('favicon.svg') }}">
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <meta name="theme-color" content="#4285f4">
+    
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-174D73GPWB"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-174D73GPWB');
+        
+        // Track file transfer events
+        function trackFileTransfer(transferUrl) {
+            gtag('event', 'file_transfer_started', {
+                'event_category': 'engagement',
+                'event_label': 'WeTransfer to Google Drive',
+                'value': 1
+            });
+        }
+        
+        // Track subscription events
+        function trackSubscription(planName, price) {
+            gtag('event', 'subscription_selected', {
+                'event_category': 'ecommerce',
+                'event_label': planName,
+                'value': price
+            });
+        }
+    </script>
+    
     <style>
         * {
             margin: 0;
@@ -670,7 +698,7 @@
                 <!-- File Transfer Form -->
                 <div style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 8px 20px rgba(0,0,0,0.1);">
                     <h2 style="margin-bottom: 20px; color: #333;">🔗 Transfer WeTransfer Files</h2>
-                    <form method="POST" action="{{ route('transfer') }}" class="transfer-form">
+                    <form method="POST" action="{{ route('transfer') }}" class="transfer-form" onsubmit="trackFileTransfer(this.wetransfer_url.value)">
                         @csrf
                         <div class="form-group">
                             <label for="wetransfer_url">WeTransfer URL</label>
