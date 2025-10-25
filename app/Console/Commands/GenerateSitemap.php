@@ -34,6 +34,36 @@ class GenerateSitemap extends Command
                 'priority' => '0.9'
             ],
             [
+                'url' => $baseUrl . '/wetransfer-pricing',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'weekly',
+                'priority' => '0.8'
+            ],
+            [
+                'url' => $baseUrl . '/wetransfer-send-files',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'weekly',
+                'priority' => '0.8'
+            ],
+            [
+                'url' => $baseUrl . '/wetransfer-upload',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'weekly',
+                'priority' => '0.8'
+            ],
+            [
+                'url' => $baseUrl . '/wetransfer-free',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'weekly',
+                'priority' => '0.8'
+            ],
+            [
+                'url' => $baseUrl . '/wetransfer-alternative',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'weekly',
+                'priority' => '0.9'
+            ],
+            [
                 'url' => $baseUrl . '/auth/google',
                 'lastmod' => now()->format('Y-m-d'),
                 'changefreq' => 'monthly',
