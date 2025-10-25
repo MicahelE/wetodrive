@@ -1,0 +1,38 @@
+{
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+        {
+            "@type": "Question",
+            "name": "How do I upload files to WeTransfer?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "To upload files to WeTransfer: 1) Go to wetransfer.com, 2) Click the '+' button or drag files onto the page, 3) Add recipient emails, 4) Include a message, 5) Click Transfer to upload and send."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "What's the maximum file size for WeTransfer uploads?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "WeTransfer Free allows uploads up to 2GB total per transfer. WeTransfer Pro increases this limit to 20GB per transfer."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "How long do WeTransfer uploads take?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Upload time depends on file size and internet speed. A 1GB file typically takes 5-15 minutes on a standard broadband connection."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "Can I upload folders to WeTransfer?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "WeTransfer doesn't support direct folder uploads. You need to compress folders into ZIP files first, or select individual files from the folder."
+            }
+        }
+    ]
+}

@@ -1,0 +1,60 @@
+{
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to Send Files with WeTransfer",
+    "description": "Step-by-step guide to sending large files using WeTransfer and automatically saving them to Google Drive",
+    "totalTime": "PT5M",
+    "estimatedCost": {
+        "@type": "MonetaryAmount",
+        "currency": "USD",
+        "value": "0"
+    },
+    "supply": [
+        {
+            "@type": "HowToSupply",
+            "name": "Files to send"
+        },
+        {
+            "@type": "HowToSupply",
+            "name": "Recipient email address"
+        }
+    ],
+    "tool": [
+        {
+            "@type": "HowToTool",
+            "name": "WeTransfer website"
+        },
+        {
+            "@type": "HowToTool",
+            "name": "WetoDrive (optional)"
+        }
+    ],
+    "step": [
+        {
+            "@type": "HowToStep",
+            "name": "Visit WeTransfer",
+            "text": "Go to wetransfer.com in your web browser",
+            "url": "https://wetransfer.com"
+        },
+        {
+            "@type": "HowToStep",
+            "name": "Add Files",
+            "text": "Click the '+' button to add files or drag and drop them onto the page"
+        },
+        {
+            "@type": "HowToStep",
+            "name": "Enter Email Addresses",
+            "text": "Add recipient email addresses in the 'Email to' field"
+        },
+        {
+            "@type": "HowToStep",
+            "name": "Add Message",
+            "text": "Include an optional message to accompany your files"
+        },
+        {
+            "@type": "HowToStep",
+            "name": "Send Transfer",
+            "text": "Click 'Transfer' to send your files"
+        }
+    ]
+}

@@ -29,7 +29,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2a42f7 0%, #1a2d99 100%);
             min-height: 100vh;
             padding: 40px 20px;
         }
@@ -255,6 +255,69 @@
             background: #4285f4;
             transition: width 0.3s ease;
         }
+
+        /* Footer */
+        .footer {
+            background: #1a1a1a;
+            color: white;
+            padding: 40px 20px 20px;
+            margin-top: 60px;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+
+        .footer-section h4 {
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .footer-section p {
+            color: #b0b0b0;
+            line-height: 1.6;
+        }
+
+        .footer-section a {
+            color: #b0b0b0;
+            text-decoration: none;
+            transition: color 0.3s;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .footer-section a:hover {
+            color: #4285f4;
+        }
+
+        .footer-bottom {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #333;
+            color: #808080;
+        }
+
+        .producthunt-badge {
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .footer-content {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .producthunt-badge img {
+                width: 200px !important;
+                height: auto !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -426,5 +489,46 @@
             <a href="{{ route('subscription.pricing') }}" class="btn btn-outline">View All Plans</a>
         </div>
     </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>📦 WetoDrive</h4>
+                <p style="font-size: 0.9rem;">
+                    Transfer files from WeTransfer to Google Drive instantly. No downloads, no storage limits on your device.
+                </p>
+                <div class="producthunt-badge">
+                    <a href="https://www.producthunt.com/products/wetodrive?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-wetodrive" target="_blank">
+                        <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1029974&theme=light&t=1761306053608" alt="WetoDrive - Automatically save WeTransfer files to Google Drive | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" />
+                    </a>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h4>Quick Links</h4>
+                <a href="{{ route('home') }}">Home</a>
+                <a href="{{ route('subscription.pricing') }}">Pricing</a>
+                <a href="{{ route('subscription.manage') }}">Dashboard</a>
+            </div>
+            <div class="footer-section">
+                <h4>WeTransfer Guides</h4>
+                <a href="{{ route('seo.pricing') }}">WeTransfer Pricing</a>
+                <a href="{{ route('seo.send-files') }}">How to Send Files</a>
+                <a href="{{ route('seo.upload') }}">Upload Tutorial</a>
+                <a href="{{ route('seo.free') }}">Free Plan Guide</a>
+                <a href="{{ route('seo.alternative') }}">WeTransfer Alternative</a>
+            </div>
+            <div class="footer-section">
+                <h4>Support</h4>
+                <a href="#" style="pointer-events: none;">Help Center</a>
+                <a href="#" style="pointer-events: none;">Contact Us</a>
+                <a href="#" style="pointer-events: none;">Privacy Policy</a>
+                <a href="#" style="pointer-events: none;">Terms of Service</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; {{ date('Y') }} WetoDrive. All rights reserved. Built with ❤️ for seamless file transfers.</p>
+        </div>
+    </footer>
 </body>
 </html>

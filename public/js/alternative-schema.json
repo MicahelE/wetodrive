@@ -1,0 +1,20 @@
+{
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Best WeTransfer Alternative 2025: WetoDrive Automates Google Drive Saves",
+    "description": "Looking for a WeTransfer alternative? WetoDrive automatically saves files from WeTransfer to Google Drive. No downloads, no manual uploads.",
+    "author": {
+        "@type": "Organization",
+        "name": "WetoDrive"
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "WetoDrive",
+        "logo": {
+            "@type": "ImageObject",
+            "url": "https://wetodrive.com/favicon.svg"
+        }
+    },
+    "datePublished": "2025-10-25",
+    "dateModified": "2025-10-25"
+}

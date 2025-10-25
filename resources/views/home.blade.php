@@ -467,6 +467,28 @@
             color: #808080;
         }
 
+        /* Product Hunt Badge Styling */
+        .producthunt-badge {
+            margin-top: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .producthunt-badge:hover {
+            transform: translateY(-2px);
+        }
+
+        .producthunt-badge img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: box-shadow 0.3s ease;
+        }
+
+        .producthunt-badge:hover img {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        }
+
         /* Mobile Responsiveness */
         @media (max-width: 768px) {
             .nav-links {
@@ -490,6 +512,11 @@
                 grid-template-columns: 1fr;
                 text-align: center;
             }
+
+            .producthunt-badge img {
+                width: 200px !important;
+                height: auto !important;
+            }
         }
     </style>
 </head>
@@ -505,7 +532,11 @@
                 <a href="{{ route('home') }}">Home</a>
                 <a href="{{ route('subscription.pricing') }}">Pricing</a>
                 @auth
-                    <a href="{{ route('subscription.manage') }}">Dashboard</a>
+                    @if(Auth::user()->isAdmin())
+                        <a href="{{ route('admin.dashboard') }}">Admin</a>
+                    @else
+                        <a href="{{ route('subscription.manage') }}">Dashboard</a>
+                    @endif
                 @endauth
             </div>
 
@@ -729,6 +760,11 @@
                 <p style="font-size: 0.9rem;">
                     Transfer files from WeTransfer to Google Drive instantly. No downloads, no storage limits on your device.
                 </p>
+                <div class="producthunt-badge">
+                    <a href="https://www.producthunt.com/products/wetodrive?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-wetodrive" target="_blank">
+                        <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1029974&theme=light&t=1761306053608" alt="WetoDrive - Automatically save WeTransfer files to Google Drive | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" />
+                    </a>
+                </div>
             </div>
             <div class="footer-section">
                 <h4>Quick Links</h4>
@@ -741,11 +777,12 @@
                 @endauth
             </div>
             <div class="footer-section">
-                <h4>Features</h4>
-                <a href="#" style="pointer-events: none;">Instant Transfers</a>
-                <a href="#" style="pointer-events: none;">No Storage Used</a>
-                <a href="#" style="pointer-events: none;">Secure & Fast</a>
-                <a href="#" style="pointer-events: none;">Multiple File Formats</a>
+                <h4>WeTransfer Guides</h4>
+                <a href="{{ route('seo.pricing') }}">WeTransfer Pricing</a>
+                <a href="{{ route('seo.send-files') }}">How to Send Files</a>
+                <a href="{{ route('seo.upload') }}">Upload Tutorial</a>
+                <a href="{{ route('seo.free') }}">Free Plan Guide</a>
+                <a href="{{ route('seo.alternative') }}">WeTransfer Alternative</a>
             </div>
             <div class="footer-section">
                 <h4>Support</h4>

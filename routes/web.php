@@ -5,9 +5,17 @@ use App\Http\Controllers\TransferController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\SeoController;
 
 Route::get('/', [TransferController::class, 'index'])->name('home');
 Route::post('/transfer', [TransferController::class, 'transfer'])->name('transfer');
+
+// SEO Landing Pages
+Route::get('/wetransfer-pricing', [SeoController::class, 'pricing'])->name('seo.pricing');
+Route::get('/wetransfer-send-files', [SeoController::class, 'sendFiles'])->name('seo.send-files');
+Route::get('/wetransfer-upload', [SeoController::class, 'upload'])->name('seo.upload');
+Route::get('/wetransfer-free', [SeoController::class, 'free'])->name('seo.free');
+Route::get('/wetransfer-alternative', [SeoController::class, 'alternative'])->name('seo.alternative');
 
 // Sitemap route
 Route::get('/sitemap.xml', function () {

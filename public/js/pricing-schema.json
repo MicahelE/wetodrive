@@ -1,0 +1,30 @@
+{
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+        {
+            "@type": "Question",
+            "name": "Is WeTransfer free?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes, WeTransfer offers a free plan that allows you to send files up to 2GB and store them for 7 days. However, the free plan has limitations on file size, storage duration, and transfer history."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "How much does WeTransfer Pro cost?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "WeTransfer Pro costs $12 per month or $120 per year (2025 pricing). It includes 100GB storage, files up to 20GB, 1TB monthly transfers, and longer storage duration up to 28 days."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "What's the difference between WeTransfer Free and Pro?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "WeTransfer Free allows 2GB file transfers stored for 7 days, while Pro offers 20GB files, 100GB storage, 1TB monthly transfers, password protection, and 28-day storage duration."
+            }
+        }
+    ]
+}

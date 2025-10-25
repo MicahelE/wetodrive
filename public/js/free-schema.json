@@ -1,0 +1,38 @@
+{
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+        {
+            "@type": "Question",
+            "name": "Is WeTransfer completely free?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes, WeTransfer offers a completely free plan with no account required. You can send files up to 2GB total per transfer, and files are stored for 7 days."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "What are the limitations of WeTransfer free?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "WeTransfer Free limits include: 2GB maximum per transfer, 7-day storage duration, no password protection, no transfer history, and no custom backgrounds."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "How long do WeTransfer free files last?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Files sent via WeTransfer Free are available for download for 7 days. After this period, they are automatically deleted and cannot be recovered."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "Can I extend WeTransfer free storage time?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No, WeTransfer Free files automatically expire after 7 days. To keep files longer, upgrade to WeTransfer Pro (28 days) or use WetoDrive to save files permanently to Google Drive."
+            }
+        }
+    ]
+}
