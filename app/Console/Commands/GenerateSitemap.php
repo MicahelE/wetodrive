@@ -64,6 +64,36 @@ class GenerateSitemap extends Command
                 'priority' => '0.9'
             ],
             [
+                'url' => $baseUrl . '/save-to-google-drive',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'weekly',
+                'priority' => '0.9'
+            ],
+            [
+                'url' => $baseUrl . '/help',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'weekly',
+                'priority' => '0.7'
+            ],
+            [
+                'url' => $baseUrl . '/contact',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'monthly',
+                'priority' => '0.6'
+            ],
+            [
+                'url' => $baseUrl . '/privacy',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'monthly',
+                'priority' => '0.5'
+            ],
+            [
+                'url' => $baseUrl . '/terms',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'monthly',
+                'priority' => '0.5'
+            ],
+            [
                 'url' => $baseUrl . '/auth/google',
                 'lastmod' => now()->format('Y-m-d'),
                 'changefreq' => 'monthly',

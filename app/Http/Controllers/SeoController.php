@@ -65,4 +65,16 @@ class SeoController extends Controller
 
         return view('seo.alternative', compact('metaData'));
     }
+
+    public function googleDriveGuide()
+    {
+        $metaData = [
+            'title' => 'How to Save Files to Google Drive from WeTransfer - Complete Guide 2025',
+            'description' => 'Learn how to automatically save WeTransfer files directly to Google Drive. Step-by-step guide using WetoDrive for instant file transfers without downloading.',
+            'keywords' => 'save files to google drive, wetransfer to google drive, transfer files to google drive, google drive file upload, automatic file saving',
+            'canonical' => route('seo.google-drive-guide'),
+        ];
+
+        return view('seo.google-drive-guide', compact('metaData'));
+    }
 }

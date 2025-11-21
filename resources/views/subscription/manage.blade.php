@@ -520,10 +520,10 @@
             </div>
             <div class="footer-section">
                 <h4>Support</h4>
-                <a href="#" style="pointer-events: none;">Help Center</a>
-                <a href="#" style="pointer-events: none;">Contact Us</a>
-                <a href="#" style="pointer-events: none;">Privacy Policy</a>
-                <a href="#" style="pointer-events: none;">Terms of Service</a>
+                <a href="{{ route('support.help') }}">Help Center</a>
+                <a href="{{ route('support.contact') }}">Contact Us</a>
+                <a href="{{ route('support.privacy') }}">Privacy Policy</a>
+                <a href="{{ route('support.terms') }}">Terms of Service</a>
             </div>
         </div>
         <div class="footer-bottom">

@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\SeoController;
+use App\Http\Controllers\SupportController;
 
 Route::get('/', [TransferController::class, 'index'])->name('home');
 Route::post('/transfer', [TransferController::class, 'transfer'])->name('transfer');
@@ -16,6 +17,13 @@ Route::get('/wetransfer-send-files', [SeoController::class, 'sendFiles'])->name(
 Route::get('/wetransfer-upload', [SeoController::class, 'upload'])->name('seo.upload');
 Route::get('/wetransfer-free', [SeoController::class, 'free'])->name('seo.free');
 Route::get('/wetransfer-alternative', [SeoController::class, 'alternative'])->name('seo.alternative');
+Route::get('/save-to-google-drive', [SeoController::class, 'googleDriveGuide'])->name('seo.google-drive-guide');
+
+// Support Pages
+Route::get('/help', [SupportController::class, 'help'])->name('support.help');
+Route::get('/contact', [SupportController::class, 'contact'])->name('support.contact');
+Route::get('/privacy', [SupportController::class, 'privacy'])->name('support.privacy');
+Route::get('/terms', [SupportController::class, 'terms'])->name('support.terms');
 
 // Sitemap route
 Route::get('/sitemap.xml', function () {
