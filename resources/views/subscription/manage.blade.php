@@ -517,6 +517,7 @@
                 <a href="{{ route('seo.upload') }}">Upload Tutorial</a>
                 <a href="{{ route('seo.free') }}">Free Plan Guide</a>
                 <a href="{{ route('seo.alternative') }}">WeTransfer Alternative</a>
+                <a href="{{ route('seo.google-drive-guide') }}">Save to Google Drive</a>
             </div>
             <div class="footer-section">
                 <h4>Support</h4>

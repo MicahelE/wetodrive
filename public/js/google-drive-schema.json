@@ -1,0 +1,34 @@
+{
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to Save Files to Google Drive from WeTransfer",
+    "description": "Complete guide on automatically transferring files from WeTransfer to Google Drive using WetoDrive",
+    "totalTime": "PT2M",
+    "supply": [
+        {
+            "@type": "HowToSupply",
+            "name": "Google Account"
+        },
+        {
+            "@type": "HowToSupply",
+            "name": "WeTransfer link"
+        }
+    ],
+    "step": [
+        {
+            "@type": "HowToStep",
+            "name": "Sign in with Google",
+            "text": "Connect your Google Drive account to WetoDrive"
+        },
+        {
+            "@type": "HowToStep",
+            "name": "Paste WeTransfer URL",
+            "text": "Enter your WeTransfer download link"
+        },
+        {
+            "@type": "HowToStep",
+            "name": "Transfer to Drive",
+            "text": "Click transfer and files save automatically to Google Drive"
+        }
+    ]
+}

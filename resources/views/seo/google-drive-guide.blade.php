@@ -11,49 +11,21 @@
     <!-- Open Graph -->
     <meta property="og:title" content="{{ $metaData['title'] ?? 'How to Save Files to Google Drive from WeTransfer' }}">
     <meta property="og:description" content="{{ $metaData['description'] ?? 'Automatic file transfer from WeTransfer to Google Drive' }}">
-    <meta property="og:type" content="website">
+    <meta property="og:type" content="article">
     <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:site_name" content="WetoDrive">
 
-    <!-- Schema.org structured data -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "HowTo",
-        "name": "How to Save Files to Google Drive from WeTransfer",
-        "description": "Complete guide on automatically transferring files from WeTransfer to Google Drive using WetoDrive",
-        "totalTime": "PT2M",
-        "supply": [
-            {
-                "@type": "HowToSupply",
-                "name": "Google Account"
-            },
-            {
-                "@type": "HowToSupply",
-                "name": "WeTransfer link"
-            }
-        ],
-        "step": [
-            {
-                "@type": "HowToStep",
-                "name": "Sign in with Google",
-                "text": "Connect your Google Drive account to WetoDrive"
-            },
-            {
-                "@type": "HowToStep",
-                "name": "Paste WeTransfer URL",
-                "text": "Enter your WeTransfer download link"
-            },
-            {
-                "@type": "HowToStep",
-                "name": "Transfer to Drive",
-                "text": "Click transfer and files save automatically to Google Drive"
-            }
-        ]
-    }
-    </script>
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $metaData['title'] ?? 'How to Save Files to Google Drive from WeTransfer' }}">
+    <meta name="twitter:description" content="{{ $metaData['description'] ?? 'Automatic file transfer from WeTransfer to Google Drive' }}">
 
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+
+    <!-- External CSS -->
+    <link rel="stylesheet" href="{{ asset('css/seo-pages.css') }}">
 
     <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-174D73GPWB"></script>
@@ -62,64 +34,30 @@
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
         gtag('config', 'G-174D73GPWB');
+
+        function trackCTA(location) {
+            gtag('event', 'seo_cta_click', {
+                'event_category': 'seo',
+                'event_label': 'google_drive_guide_' + location,
+                'value': 1
+            });
+        }
+    </script>
+
+    <!-- Load Structured Data -->
+    <script>
+        fetch('{{ asset('js/google-drive-schema.json') }}')
+            .then(response => response.json())
+            .then(data => {
+                const script = document.createElement('script');
+                script.type = 'application/ld+json';
+                script.textContent = JSON.stringify(data);
+                document.head.appendChild(script);
+            });
     </script>
 
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8f9fa;
-            color: #333;
-            line-height: 1.6;
-        }
-
-        /* Navigation */
-        .navbar {
-            background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 15px 0;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #333;
-            text-decoration: none;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 30px;
-            align-items: center;
-        }
-
-        .nav-links a {
-            color: #333;
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.3s;
-        }
-
-        .nav-links a:hover {
-            color: #4285f4;
-        }
+        /* Custom styles for Google Drive Guide page */
 
         /* Hero Section */
         .hero-section {
@@ -430,11 +368,7 @@
             <div class="nav-links">
                 <a href="{{ route('home') }}">Home</a>
                 <a href="{{ route('subscription.pricing') }}">Pricing</a>
-                @auth
-                    <a href="{{ route('subscription.manage') }}">Dashboard</a>
-                @else
-                    <a href="{{ route('auth.google') }}">Sign In</a>
-                @endauth
+                <a href="{{ route('auth.google') }}" class="cta-button" onclick="trackCTA('nav')">Try WetoDrive Free</a>
             </div>
         </div>
     </nav>
@@ -744,9 +678,6 @@
                 <h4>📦 WetoDrive</h4>
                 <a href="{{ route('home') }}">Home</a>
                 <a href="{{ route('subscription.pricing') }}">Pricing</a>
-                @auth
-                    <a href="{{ route('subscription.manage') }}">Dashboard</a>
-                @endauth
             </div>
             <div class="footer-section">
                 <h4>WeTransfer Guides</h4>
@@ -754,6 +685,8 @@
                 <a href="{{ route('seo.send-files') }}">How to Send Files</a>
                 <a href="{{ route('seo.upload') }}">Upload Tutorial</a>
                 <a href="{{ route('seo.free') }}">Free Plan Guide</a>
+                <a href="{{ route('seo.alternative') }}">WeTransfer Alternative</a>
+                <a href="{{ route('seo.google-drive-guide') }}">Save to Google Drive</a>
             </div>
             <div class="footer-section">
                 <h4>Support</h4>
