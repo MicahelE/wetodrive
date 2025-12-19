@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Google_Client;
 use Google_Service_Drive;
 use Google_Service_Drive_DriveFile;
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
+use App\Services\StreamTransferService;
+use App\Http\Controllers\StreamProgressController;
 
 class TransferController extends Controller
 {
@@ -20,18 +23,28 @@ class TransferController extends Controller
 
     public function transfer(Request $request)
     {
-        set_time_limit(300);
+        set_time_limit(0); // No time limit for streaming large files
 
         $request->validate([
-            'wetransfer_url' => 'required|url'
+            'wetransfer_url' => 'required|url',
+            'use_streaming' => 'boolean'
         ]);
 
         if (!Auth::check()) {
             Log::warning('Transfer attempted without Google Drive authentication');
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Please connect to Google Drive first.'
+                ], 401);
+            }
+
             return redirect()->back()->with('error', 'Please connect to Google Drive first.');
         }
 
         $user = Auth::user();
+        $useStreaming = $request->get('use_streaming', true); // Default to streaming
 
         // Check subscription limits
         if (!$this->checkTransferLimits($user)) {
@@ -39,6 +52,13 @@ class TransferController extends Controller
                 'user_id' => $user->id,
                 'subscription_tier' => $user->subscription_tier
             ]);
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'You have reached your transfer limit for this month. Please upgrade your plan to continue.'
+                ], 403);
+            }
 
             return redirect()->back()->with('error',
                 'You have reached your transfer limit for this month. ' .
@@ -48,11 +68,240 @@ class TransferController extends Controller
 
         try {
             $wetransferUrl = $request->wetransfer_url;
-            Log::info('Starting WeTransfer download process', ['url' => $wetransferUrl]);
-            
+            Log::info('Starting WeTransfer process', [
+                'url' => $wetransferUrl,
+                'use_streaming' => $useStreaming,
+                'is_ajax' => $request->ajax()
+            ]);
+
+            if ($useStreaming) {
+                // Use new streaming approach
+                return $this->transferWithStreaming($wetransferUrl, $user, $request);
+            } else {
+                // Use legacy disk-based approach
+                return $this->transferWithDisk($wetransferUrl, $user);
+            }
+        } catch (\Exception $e) {
+            Log::error('Transfer failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Transfer failed: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return redirect()->back()->with('error', 'Transfer failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Transfer using direct streaming (no temporary files)
+     */
+    private function transferWithStreaming(string $wetransferUrl, $user, Request $request)
+    {
+        $streamService = new StreamTransferService();
+        $transferId = uniqid('transfer_', true);
+
+        try {
+            // Parse WeTransfer URL to get download link
+            $downloadUrl = $streamService->parseWeTransferUrl($wetransferUrl);
+            Log::info('Parsed download URL for streaming', ['download_url' => $downloadUrl]);
+
+            // Get file metadata
+            $fileInfo = [];
+            $stream = $streamService->getWeTransferStream($downloadUrl, $fileInfo);
+
+            Log::info('Got WeTransfer stream', [
+                'filename' => $fileInfo['filename'],
+                'size' => $fileInfo['size'],
+                'mimeType' => $fileInfo['mimeType']
+            ]);
+
+            // Validate file size against subscription limits
+            if (!$this->checkFileSizeLimit($user, $fileInfo['size'])) {
+                $maxSize = $this->getMaxFileSizeForUser($user);
+
+                // For Ajax request, return JSON error
+                if ($request->ajax()) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'File size (' . $this->formatFileSize($fileInfo['size']) . ') exceeds your plan limit of ' . $this->formatFileSize($maxSize) . '.'
+                    ], 400);
+                }
+
+                return redirect()->back()->with('error',
+                    'File size (' . $this->formatFileSize($fileInfo['size']) . ') exceeds your plan limit of ' . $this->formatFileSize($maxSize) . '. ' .
+                    '<a href="' . route('subscription.pricing') . '" style="color: #4285f4; text-decoration: underline;">Upgrade your plan</a> for larger files.'
+                );
+            }
+
+            // Store transfer ID in session for progress tracking
+            session(['current_transfer_id' => $transferId]);
+
+            // For Ajax requests, return immediately and process in background
+            if ($request->ajax()) {
+                Log::info('[AJAX] Processing Ajax transfer request (async)', [
+                    'transfer_id' => $transferId,
+                    'filename' => $fileInfo['filename'],
+                    'size' => $fileInfo['size'],
+                    'size_mb' => round($fileInfo['size'] / 1048576, 2),
+                    'mime_type' => $fileInfo['mimeType'] ?? 'unknown',
+                    'user_id' => $user->id,
+                    'timestamp' => now()->toIso8601String()
+                ]);
+
+                // Initialize progress in cache
+                StreamProgressController::updateProgress($transferId, 0, $fileInfo['size'], $fileInfo['filename'], 'starting');
+
+                // Prepare and send response immediately
+                $response = response()->json([
+                    'success' => true,
+                    'transfer_id' => $transferId,
+                    'filename' => $fileInfo['filename'],
+                    'size' => $fileInfo['size'],
+                    'status' => 'processing'
+                ]);
+
+                Log::info('[AJAX] Sending immediate response, will continue in background', [
+                    'transfer_id' => $transferId
+                ]);
+
+                // Send response to client immediately
+                $response->send();
+
+                // Flush output and close connection to client
+                if (function_exists('fastcgi_finish_request')) {
+                    fastcgi_finish_request();
+                } else {
+                    // Fallback for non-FPM environments
+                    if (ob_get_level() > 0) {
+                        ob_end_flush();
+                    }
+                    flush();
+                }
+
+                // Continue processing in background
+                ignore_user_abort(true);
+                set_time_limit(0);
+
+                try {
+                    $transferStartTime = microtime(true);
+
+                    // Set progress callback for real-time updates
+                    $streamService->setProgressCallback(function($uploaded, $total) use ($transferId, $fileInfo) {
+                        StreamProgressController::updateProgress(
+                            $transferId,
+                            $uploaded,
+                            $total,
+                            $fileInfo['filename'],
+                            'transferring'
+                        );
+                    });
+
+                    // Perform the actual transfer
+                    Log::info('[AJAX] Starting background stream transfer', [
+                        'transfer_id' => $transferId,
+                        'download_url_length' => strlen($downloadUrl)
+                    ]);
+
+                    $googleDriveFileId = $streamService->streamTransfer($downloadUrl, $fileInfo, $user, $transferId);
+
+                    $transferEndTime = microtime(true);
+                    $transferDuration = $transferEndTime - $transferStartTime;
+                    $transferSpeed = ($fileInfo['size'] / $transferDuration) / 1048576; // MB/s
+
+                    Log::info('[AJAX] Background transfer completed successfully', [
+                        'filename' => $fileInfo['filename'],
+                        'file_id' => $googleDriveFileId,
+                        'transfer_id' => $transferId,
+                        'duration_seconds' => round($transferDuration, 2),
+                        'speed_mbps' => round($transferSpeed, 2),
+                        'timestamp' => now()->toIso8601String()
+                    ]);
+
+                    // Increment transfer count after successful upload
+                    $user->incrementTransferCount();
+
+                    // Mark transfer as complete and store result
+                    StreamProgressController::completeTransfer($transferId, true);
+                    Cache::put("transfer_result_{$transferId}", [
+                        'success' => true,
+                        'google_drive_id' => $googleDriveFileId,
+                        'filename' => $fileInfo['filename']
+                    ], 300);
+
+                } catch (\Exception $e) {
+                    $errorTime = isset($transferStartTime) ? microtime(true) - $transferStartTime : 0;
+
+                    Log::error('[AJAX] Background transfer failed', [
+                        'transfer_id' => $transferId,
+                        'error' => $e->getMessage(),
+                        'error_class' => get_class($e),
+                        'error_file' => $e->getFile(),
+                        'error_line' => $e->getLine(),
+                        'time_until_error' => round($errorTime, 2),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+
+                    // Mark transfer as failed
+                    StreamProgressController::completeTransfer($transferId, false);
+                    Cache::put("transfer_result_{$transferId}", [
+                        'success' => false,
+                        'error' => $e->getMessage()
+                    ], 300);
+                }
+
+                // Response already sent, just return
+                return;
+            }
+
+            // For non-Ajax requests, process synchronously
+            $googleDriveFileId = $streamService->streamTransfer($downloadUrl, $fileInfo, $user, $transferId);
+
+            Log::info('File streamed to Google Drive successfully', [
+                'filename' => $fileInfo['filename'],
+                'file_id' => $googleDriveFileId
+            ]);
+
+            // Increment transfer count after successful upload
+            $user->incrementTransferCount();
+
+            $googleDriveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
+            $successMessage = 'File transferred to Google Drive successfully! ' .
+                '<a href="' . $googleDriveUrl . '" target="_blank" style="color: #4285f4; text-decoration: underline; font-weight: 600;">📁 View in Google Drive</a>';
+
+            return redirect()->back()->with('success', $successMessage);
+
+        } catch (\Exception $e) {
+            Log::error('Streaming transfer failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+
+            throw $e;
+        }
+    }
+
+/**
+     * Transfer using legacy disk-based approach
+     */
+    private function transferWithDisk(string $wetransferUrl, $user)
+    {
+        try {
             $downloadUrl = $this->parseWeTransferUrl($wetransferUrl);
             Log::info('Parsed download URL', ['download_url' => $downloadUrl]);
-            
+
             $fileInfo = $this->downloadFile($downloadUrl);
             Log::info('File downloaded to disk', [
                 'filename' => $fileInfo['filename'],
@@ -90,18 +339,12 @@ class TransferController extends Controller
 
             return redirect()->back()->with('success', $successMessage);
         } catch (\Exception $e) {
-            Log::error('Transfer failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
             // Cleanup any temp files that might have been created
             if (isset($fileInfo['temp_file']) && file_exists($fileInfo['temp_file'])) {
                 unlink($fileInfo['temp_file']);
                 Log::info('Cleaned up temp file after error', ['temp_file' => $fileInfo['temp_file']]);
             }
-            
-            return redirect()->back()->with('error', 'Transfer failed: ' . $e->getMessage());
+            throw $e;
         }
     }
 

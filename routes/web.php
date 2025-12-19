@@ -7,9 +7,13 @@ use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SupportController;
+use App\Http\Controllers\StreamProgressController;
 
 Route::get('/', [TransferController::class, 'index'])->name('home');
 Route::post('/transfer', [TransferController::class, 'transfer'])->name('transfer');
+
+// Progress tracking for streaming transfers
+Route::get('/transfer/progress', [StreamProgressController::class, 'streamProgress'])->name('transfer.progress');
 
 // SEO Landing Pages
 Route::get('/wetransfer-pricing', [SeoController::class, 'pricing'])->name('seo.pricing');

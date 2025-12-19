@@ -670,7 +670,7 @@
                             <div style="opacity: 0.8; font-size: 0.9rem;">Current Plan</div>
                         </div>
                         <div style="background: rgba(255,255,255,0.5); padding: 15px; border-radius: 8px;">
-                            <div style="font-size: 1.8rem; font-weight: bold; color: #2d5a2d;">
+                            <div style="font-size: 1.8rem; font-weight: bold; color: #2d5a2d;" data-transfers-remaining>
                                 @if(Auth::user()->hasActiveSubscription())
                                     @php $subscription = Auth::user()->activeSubscription; @endphp
                                     {{ $subscription->getRemainingTransfers() === null ? '∞' : $subscription->getRemainingTransfers() }}
@@ -681,7 +681,7 @@
                             <div style="opacity: 0.8; font-size: 0.9rem;">Transfers Remaining</div>
                         </div>
                         <div style="background: rgba(255,255,255,0.5); padding: 15px; border-radius: 8px;">
-                            <div style="font-size: 1.8rem; font-weight: bold; color: #2d5a2d;">{{ Auth::user()->total_transfers }}</div>
+                            <div style="font-size: 1.8rem; font-weight: bold; color: #2d5a2d;" data-total-transfers>{{ Auth::user()->total_transfers }}</div>
                             <div style="opacity: 0.8; font-size: 0.9rem;">Total Transfers</div>
                         </div>
                     </div>
@@ -729,24 +729,65 @@
                 <!-- File Transfer Form -->
                 <div style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 8px 20px rgba(0,0,0,0.1);">
                     <h2 style="margin-bottom: 20px; color: #333;">🔗 Transfer WeTransfer Files</h2>
-                    <form method="POST" action="{{ route('transfer') }}" class="transfer-form" onsubmit="trackFileTransfer(this.wetransfer_url.value)">
-                        @csrf
-                        <div class="form-group">
-                            <label for="wetransfer_url">WeTransfer URL</label>
-                            <input
-                                type="url"
-                                id="wetransfer_url"
-                                name="wetransfer_url"
-                                placeholder="https://wetransfer.com/downloads/... or https://we.tl/t-..."
-                                required
-                                value="{{ old('wetransfer_url') }}"
-                                style="font-size: 1rem; padding: 15px;"
-                            >
+
+                    <!-- Transfer Form -->
+                    <div id="transferFormContainer">
+                        <form id="transferForm" method="POST" action="{{ route('transfer') }}" class="transfer-form">
+                            @csrf
+                            <div class="form-group">
+                                <label for="wetransfer_url">WeTransfer URL</label>
+                                <input
+                                    type="url"
+                                    id="wetransfer_url"
+                                    name="wetransfer_url"
+                                    placeholder="https://wetransfer.com/downloads/... or https://we.tl/t-..."
+                                    required
+                                    value="{{ old('wetransfer_url') }}"
+                                    style="font-size: 1rem; padding: 15px;"
+                                >
+                            </div>
+                            <button type="submit" class="submit-button" id="transferButton" style="font-size: 1.1rem; padding: 15px;">
+                                🚀 Transfer to Google Drive
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Progress Container (hidden initially) -->
+                    <div id="progressContainer" style="display: none;">
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <div style="font-size: 1.2rem; font-weight: 600; color: #333; margin-bottom: 10px;">
+                                <span id="progressStatus">Initializing transfer...</span>
+                            </div>
+                            <div style="color: #666; font-size: 0.95rem;" id="progressFilename"></div>
                         </div>
-                        <button type="submit" class="submit-button" style="font-size: 1.1rem; padding: 15px;">
-                            🚀 Transfer to Google Drive
-                        </button>
-                    </form>
+
+                        <!-- Progress Bar -->
+                        <div style="background: #f0f0f0; border-radius: 10px; overflow: hidden; height: 30px; margin-bottom: 15px; position: relative;">
+                            <div id="progressBar" style="background: linear-gradient(90deg, #4285f4, #5a95ff); height: 100%; width: 0%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; position: relative;">
+                                <span id="progressPercent" style="color: white; font-weight: 600; font-size: 0.9rem; text-shadow: 0 1px 2px rgba(0,0,0,0.2); position: absolute;">0%</span>
+                            </div>
+                        </div>
+
+                        <!-- Transfer Stats -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                            <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px;">Transferred</div>
+                                <div style="font-size: 1.1rem; font-weight: 600; color: #333;" id="bytesTransferred">0 MB</div>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px;">Total Size</div>
+                                <div style="font-size: 1.1rem; font-weight: 600; color: #333;" id="totalSize">0 MB</div>
+                            </div>
+                        </div>
+
+                        <!-- Status Messages -->
+                        <div id="statusMessage" style="text-align: center; padding: 15px; background: #e3f2fd; border-radius: 8px; color: #1976d2; font-size: 0.95rem;">
+                            <span>⏳ Transfer in progress... Please wait.</span>
+                        </div>
+
+                        <!-- Success/Error Message (hidden initially) -->
+                        <div id="completionMessage" style="display: none; margin-top: 20px;"></div>
+                    </div>
                 </div>
             </div>
         @endauth
@@ -823,6 +864,423 @@
                 closeMobileMenu();
             }
         });
+
+        // Transfer Form Handling with Progress
+        @auth
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('[DEBUG] DOMContentLoaded - Initializing transfer form handler');
+
+            const transferForm = document.getElementById('transferForm');
+            console.log('[DEBUG] Transfer form element:', transferForm);
+
+            if (transferForm) {
+                console.log('[DEBUG] Adding submit event listener to form');
+
+                transferForm.addEventListener('submit', function(e) {
+                    console.log('[DEBUG] ============ FORM SUBMISSION START ============');
+                    console.log('[DEBUG] Form submit event triggered at:', new Date().toISOString());
+                    console.log('[DEBUG] Event type:', e.type);
+                    console.log('[DEBUG] Event target:', e.target);
+                    console.log('[DEBUG] Default prevented before:', e.defaultPrevented);
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    console.log('[DEBUG] preventDefault() and stopPropagation() called');
+                    console.log('[DEBUG] Default prevented after:', e.defaultPrevented);
+
+                    const formData = new FormData(this);
+                    const transferUrl = document.getElementById('wetransfer_url').value;
+
+                    console.log('[DEBUG] Form data prepared:');
+                    console.log('[DEBUG] - WeTransfer URL:', transferUrl);
+                    console.log('[DEBUG] - FormData entries:');
+                    for (let pair of formData.entries()) {
+                        console.log('[DEBUG]   -', pair[0], ':', pair[1]);
+                    }
+
+                    // Track analytics
+                    if (typeof trackFileTransfer === 'function') {
+                        console.log('[DEBUG] Tracking analytics');
+                        trackFileTransfer(transferUrl);
+                    }
+
+                    // Hide form, show progress
+                    console.log('[DEBUG] Switching UI to progress view');
+                    document.getElementById('transferFormContainer').style.display = 'none';
+                    document.getElementById('progressContainer').style.display = 'block';
+
+                    // Send Ajax request
+                    const fetchUrl = '{{ route("transfer") }}';
+                    const fetchOptions = {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    };
+
+                    console.log('[DEBUG] ============ STARTING AJAX REQUEST ============');
+                    console.log('[DEBUG] Request started at:', new Date().toISOString());
+                    console.log('[DEBUG] - URL:', fetchUrl);
+                    console.log('[DEBUG] - Method:', fetchOptions.method);
+                    console.log('[DEBUG] - Headers:', JSON.stringify(fetchOptions.headers, null, 2));
+                    console.log('[DEBUG] - Body is FormData with entries:', Array.from(formData.entries()));
+                    const startTime = performance.now();
+
+                    fetch(fetchUrl, fetchOptions)
+                    .then(response => {
+                        const responseTime = performance.now() - startTime;
+                        console.log('[DEBUG] ============ RESPONSE RECEIVED ============');
+                        console.log('[DEBUG] Response received at:', new Date().toISOString());
+                        console.log('[DEBUG] Response time:', responseTime.toFixed(2), 'ms');
+                        console.log('[DEBUG] - Status:', response.status);
+                        console.log('[DEBUG] - Status Text:', response.statusText);
+                        console.log('[DEBUG] - OK:', response.ok);
+                        console.log('[DEBUG] - Type:', response.type);
+                        console.log('[DEBUG] - URL:', response.url);
+                        console.log('[DEBUG] Response headers:');
+                        for (let [key, value] of response.headers.entries()) {
+                            console.log('[DEBUG]   -', key + ':', value);
+                        }
+
+                        // Clone response to read it twice if needed
+                        const clonedResponse = response.clone();
+
+                        if (!response.ok) {
+                            console.error('[DEBUG] Response not OK, attempting to parse error');
+                            return clonedResponse.text().then(text => {
+                                console.error('[DEBUG] Error response text:', text);
+                                try {
+                                    const err = JSON.parse(text);
+                                    console.error('[DEBUG] Parsed error:', err);
+                                    return Promise.reject(err);
+                                } catch (e) {
+                                    console.error('[DEBUG] Could not parse error as JSON:', e);
+                                    return Promise.reject({error: text});
+                                }
+                            });
+                        }
+
+                        return response.text().then(text => {
+                            console.log('[DEBUG] Success response text:', text);
+                            try {
+                                const data = JSON.parse(text);
+                                console.log('[DEBUG] Parsed response data:', data);
+                                return data;
+                            } catch (e) {
+                                console.error('[DEBUG] Could not parse response as JSON:', e);
+                                throw new Error('Invalid JSON response: ' + text);
+                            }
+                        });
+                    })
+                    .then(data => {
+                        console.log('[DEBUG] Processing response:', data);
+                        if (data.success) {
+                            console.log('[DEBUG] ============ TRANSFER INITIATED ============');
+                            console.log('[DEBUG] - Transfer ID:', data.transfer_id);
+                            console.log('[DEBUG] - Filename:', data.filename);
+                            console.log('[DEBUG] - Size:', data.size, 'bytes (' + formatBytes(data.size) + ')');
+                            console.log('[DEBUG] - Status:', data.status);
+
+                            // Update UI with file info
+                            if (data.filename) {
+                                document.getElementById('progressFilename').textContent = data.filename;
+                            }
+                            if (data.size) {
+                                document.getElementById('totalSize').textContent = formatBytes(data.size);
+                            }
+
+                            if (data.status === 'processing') {
+                                // Transfer started in background - connect to SSE for progress
+                                console.log('[DEBUG] Transfer processing in background, starting SSE monitoring');
+                                document.getElementById('progressStatus').textContent = 'Starting transfer...';
+                                startProgressMonitoring(data.transfer_id);
+                            } else if (data.google_drive_id) {
+                                // Immediate success (shouldn't happen with new async flow, but handle it)
+                                console.log('[DEBUG] Immediate success - Google Drive ID:', data.google_drive_id);
+                                document.getElementById('bytesTransferred').textContent = formatBytes(data.size);
+                                document.getElementById('progressBar').style.width = '100%';
+                                document.getElementById('progressPercent').textContent = '100%';
+                                document.getElementById('progressStatus').textContent = 'Transfer Complete';
+
+                                setTimeout(() => {
+                                    alert('File successfully transferred to Google Drive!');
+                                    resetTransferForm();
+                                }, 1000);
+                            }
+                        } else {
+                            console.error('[DEBUG] Response indicates failure:', data);
+                            throw new Error(data.error || 'Transfer failed');
+                        }
+                    })
+                    .catch(error => {
+                        const errorTime = performance.now() - startTime;
+                        console.error('[DEBUG] ============ TRANSFER ERROR ============');
+                        console.error('[DEBUG] Error occurred at:', new Date().toISOString());
+                        console.error('[DEBUG] Time until error:', (errorTime / 1000).toFixed(2), 'seconds');
+                        console.error('[DEBUG] Error type:', error.constructor.name);
+                        console.error('[DEBUG] Error object:', error);
+                        console.error('[DEBUG] Error message:', error.message || error.error || 'Unknown error');
+                        console.error('[DEBUG] Error stack:', error.stack);
+                        console.error('[DEBUG] Full error details:', JSON.stringify(error, null, 2));
+
+                        // Show error message
+                        document.getElementById('progressStatus').textContent = 'Transfer Failed';
+                        document.getElementById('statusMessage').style.display = 'none';
+                        document.getElementById('completionMessage').style.display = 'block';
+                        document.getElementById('completionMessage').innerHTML = `
+                            <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 8px;">
+                                <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">❌ Transfer Failed</div>
+                                <div>${error.error || error.message || 'An error occurred while starting the transfer.'}</div>
+                                <button onclick="resetTransferForm()" style="margin-top: 15px; background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                    Try Again
+                                </button>
+                            </div>
+                        `;
+                    });
+
+                    console.log('[DEBUG] Returning false to prevent default submission');
+                    return false; // Extra prevention of form submission
+                });
+            } else {
+                console.error('[DEBUG] Transfer form not found!');
+            }
+        });
+
+        function startProgressMonitoring(transferId) {
+            // Connect to SSE endpoint for progress updates
+            const url = '{{ route("transfer.progress") }}?transfer_id=' + transferId;
+            const eventSource = new EventSource(url);
+
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    updateProgress(data);
+                } catch (e) {
+                    console.error('Error parsing progress data:', e);
+                }
+            };
+
+            eventSource.addEventListener('complete', function(event) {
+                console.log('[DEBUG] SSE complete event received:', event.data);
+                eventSource.close();
+
+                try {
+                    const data = JSON.parse(event.data);
+
+                    if (data.status === 'completed' && data.success) {
+                        console.log('[DEBUG] Transfer completed successfully via SSE');
+                        console.log('[DEBUG] Google Drive ID:', data.google_drive_id);
+
+                        // Update UI to show completion
+                        document.getElementById('progressBar').style.width = '100%';
+                        document.getElementById('progressPercent').textContent = '100%';
+                        document.getElementById('progressStatus').textContent = 'Transfer Complete!';
+                        document.getElementById('statusMessage').style.display = 'none';
+                        document.getElementById('completionMessage').style.display = 'block';
+
+                        // Build success message with Google Drive link
+                        let successHtml = `
+                            <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px;">
+                                <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">✅ Transfer Successful!</div>
+                                <div style="margin-bottom: 10px;">Your file has been transferred to Google Drive.</div>`;
+
+                        if (data.google_drive_id) {
+                            successHtml += `
+                                <a href="https://drive.google.com/file/d/${data.google_drive_id}/view" target="_blank"
+                                   style="display: inline-block; background: #4285f4; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-bottom: 10px;">
+                                    📁 View in Google Drive
+                                </a><br>`;
+                        }
+
+                        successHtml += `
+                                <button onclick="resetTransferForm()" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                    Transfer Another File
+                                </button>
+                            </div>`;
+
+                        document.getElementById('completionMessage').innerHTML = successHtml;
+
+                        // Update transfer counts in UI
+                        const transfersRemainingEl = document.querySelector('[data-transfers-remaining]');
+                        if (transfersRemainingEl) {
+                            const current = parseInt(transfersRemainingEl.textContent);
+                            if (!isNaN(current) && current > 0) {
+                                transfersRemainingEl.textContent = current - 1;
+                            }
+                        }
+
+                        const totalTransfersEl = document.querySelector('[data-total-transfers]');
+                        if (totalTransfersEl) {
+                            const current = parseInt(totalTransfersEl.textContent);
+                            if (!isNaN(current)) {
+                                totalTransfersEl.textContent = current + 1;
+                            }
+                        }
+
+                    } else if (data.status === 'failed') {
+                        console.error('[DEBUG] Transfer failed via SSE:', data.error);
+
+                        document.getElementById('progressStatus').textContent = 'Transfer Failed';
+                        document.getElementById('statusMessage').style.display = 'none';
+                        document.getElementById('completionMessage').style.display = 'block';
+                        document.getElementById('completionMessage').innerHTML = `
+                            <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 8px;">
+                                <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">❌ Transfer Failed</div>
+                                <div style="margin-bottom: 10px;">${data.error || 'An error occurred during the transfer.'}</div>
+                                <button onclick="resetTransferForm()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                    Try Again
+                                </button>
+                            </div>`;
+                    }
+                } catch (e) {
+                    console.error('[DEBUG] Error parsing complete event data:', e);
+                }
+            });
+
+            eventSource.onerror = function(error) {
+                console.error('SSE connection error:', error);
+                eventSource.close();
+            };
+
+            // Alternative implementation using fetch (if EventSource doesn't work)
+            /*
+            fetch(url, {
+                headers: {
+                    'Accept': 'text/event-stream',
+                }
+            }).then(response => {
+                if (!response.ok) return;
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                function readStream() {
+                    reader.read().then(({done, value}) => {
+                        if (done) return;
+
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n');
+
+                        lines.forEach(line => {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.substring(6));
+                                    updateProgress(data);
+                                } catch (e) {
+                                    console.error('Error parsing SSE data:', e);
+                                }
+                            }
+                        });
+
+                        readStream();
+                    });
+                }
+
+                readStream();
+            }).catch(error => {
+                console.error('Error connecting to progress stream:', error);
+            });
+            */
+        }
+
+        function updateProgress(data) {
+            // Update progress bar
+            const percentage = data.percentage || 0;
+            document.getElementById('progressBar').style.width = percentage + '%';
+            document.getElementById('progressPercent').textContent = Math.round(percentage) + '%';
+
+            // Update bytes transferred
+            const bytesTransferred = formatBytes(data.bytesTransferred || 0);
+            const totalBytes = formatBytes(data.totalBytes || 0);
+            document.getElementById('bytesTransferred').textContent = bytesTransferred;
+            document.getElementById('totalSize').textContent = totalBytes;
+
+            // Update filename
+            if (data.filename) {
+                document.getElementById('progressFilename').textContent = data.filename;
+            }
+
+            // Update status
+            if (data.status === 'transferring') {
+                document.getElementById('progressStatus').textContent = 'Transferring to Google Drive...';
+                document.getElementById('statusMessage').innerHTML = '<span>⏳ Transfer in progress... Please wait.</span>';
+            } else if (data.status === 'completed') {
+                document.getElementById('progressStatus').textContent = 'Transfer Complete!';
+                document.getElementById('progressBar').style.width = '100%';
+                document.getElementById('progressPercent').textContent = '100%';
+                document.getElementById('statusMessage').style.display = 'none';
+                document.getElementById('completionMessage').style.display = 'block';
+
+                // Increment transfer count in UI
+                const transfersRemainingEl = document.querySelector('[data-transfers-remaining]');
+                if (transfersRemainingEl) {
+                    const current = parseInt(transfersRemainingEl.textContent);
+                    if (!isNaN(current) && current > 0) {
+                        transfersRemainingEl.textContent = current - 1;
+                    }
+                }
+
+                const totalTransfersEl = document.querySelector('[data-total-transfers]');
+                if (totalTransfersEl) {
+                    const current = parseInt(totalTransfersEl.textContent);
+                    if (!isNaN(current)) {
+                        totalTransfersEl.textContent = current + 1;
+                    }
+                }
+
+                document.getElementById('completionMessage').innerHTML = `
+                    <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px;">
+                        <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">✅ Transfer Successful!</div>
+                        <div style="margin-bottom: 10px;">Your file has been transferred to Google Drive.</div>
+                        <button onclick="resetTransferForm()" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                            Transfer Another File
+                        </button>
+                    </div>
+                `;
+            } else if (data.status === 'failed') {
+                document.getElementById('progressStatus').textContent = 'Transfer Failed';
+                document.getElementById('statusMessage').style.display = 'none';
+                document.getElementById('completionMessage').style.display = 'block';
+                document.getElementById('completionMessage').innerHTML = `
+                    <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 8px;">
+                        <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">❌ Transfer Failed</div>
+                        <div>There was an error transferring your file. Please try again.</div>
+                        <button onclick="resetTransferForm()" style="margin-top: 15px; background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                            Try Again
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function resetTransferForm() {
+            // Reset form and UI
+            document.getElementById('transferForm').reset();
+            document.getElementById('transferFormContainer').style.display = 'block';
+            document.getElementById('progressContainer').style.display = 'none';
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressPercent').textContent = '0%';
+            document.getElementById('bytesTransferred').textContent = '0 MB';
+            document.getElementById('totalSize').textContent = '0 MB';
+            document.getElementById('progressFilename').textContent = '';
+            document.getElementById('progressStatus').textContent = 'Initializing transfer...';
+            document.getElementById('statusMessage').style.display = 'block';
+            document.getElementById('statusMessage').innerHTML = '<span>⏳ Transfer in progress... Please wait.</span>';
+            document.getElementById('completionMessage').style.display = 'none';
+        }
+        @endauth
     </script>
 </body>
 </html>

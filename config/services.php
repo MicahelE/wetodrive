@@ -39,6 +39,7 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
+        'chunk_size' => env('GOOGLE_DRIVE_CHUNK_SIZE', 10485760), // Default 10MB, can be configured via env
     ],
 
     'paystack' => [
