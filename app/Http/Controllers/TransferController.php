@@ -142,7 +142,16 @@ class TransferController extends Controller
             // Store transfer ID in session for progress tracking
             session(['current_transfer_id' => $transferId]);
 
-            // For Ajax requests, return immediately and process in background
+            // For files < 1GB, use disk-based approach (more reliable)
+            if ($fileInfo['size'] < 1024 * 1024 * 1024) {
+                Log::info('Using disk-based transfer for file < 1GB', [
+                    'size' => $fileInfo['size'],
+                    'size_mb' => round($fileInfo['size'] / 1048576, 2)
+                ]);
+                return $this->transferWithDiskAsync($downloadUrl, $user, $request, $fileInfo, $transferId);
+            }
+
+            // For Ajax requests with files >= 1GB, use streaming approach
             if ($request->ajax()) {
                 Log::info('[AJAX] Processing Ajax transfer request (async)', [
                     'transfer_id' => $transferId,
@@ -291,6 +300,113 @@ class TransferController extends Controller
 
             throw $e;
         }
+    }
+
+    /**
+     * Transfer using disk-based approach with async AJAX pattern
+     * Downloads to temp file, then uploads to Google Drive
+     * Used for files < 1GB for better reliability
+     */
+    private function transferWithDiskAsync(string $downloadUrl, $user, Request $request, array $fileInfo, string $transferId)
+    {
+        if ($request->ajax()) {
+            Log::info('[AJAX] Processing disk-based transfer (async)', [
+                'transfer_id' => $transferId,
+                'filename' => $fileInfo['filename'],
+                'size' => $fileInfo['size'],
+                'size_mb' => round($fileInfo['size'] / 1048576, 2),
+                'user_id' => $user->id
+            ]);
+
+            // Initialize progress in cache
+            StreamProgressController::updateProgress($transferId, 0, $fileInfo['size'], $fileInfo['filename'], 'starting');
+
+            // Prepare and send response immediately
+            $response = response()->json([
+                'success' => true,
+                'transfer_id' => $transferId,
+                'filename' => $fileInfo['filename'],
+                'size' => $fileInfo['size'],
+                'status' => 'processing'
+            ]);
+
+            $response->send();
+
+            // Flush output and close connection to client
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            } else {
+                if (ob_get_level() > 0) {
+                    ob_end_flush();
+                }
+                flush();
+            }
+
+            // Continue processing in background
+            ignore_user_abort(true);
+            set_time_limit(0);
+
+            try {
+                $totalSize = $fileInfo['size'];
+
+                // Phase 1: Download from WeTransfer (0-50% progress)
+                Log::info('[AJAX] Starting download phase', ['transfer_id' => $transferId]);
+
+                $downloadedFileInfo = $this->downloadFile($downloadUrl, function($downloaded, $total) use ($transferId, $fileInfo, $totalSize) {
+                    $percentage = $total > 0 ? ($downloaded / $total) * 50 : 0;
+                    $bytesProgress = (int)($totalSize * $percentage / 100);
+                    StreamProgressController::updateProgress($transferId, $bytesProgress, $totalSize, $fileInfo['filename'], 'downloading');
+                });
+
+                Log::info('[AJAX] Download complete, starting upload phase', [
+                    'transfer_id' => $transferId,
+                    'temp_file' => $downloadedFileInfo['temp_file']
+                ]);
+
+                // Phase 2: Upload to Google Drive (50-100% progress)
+                $googleDriveFileId = $this->uploadToGoogleDrive($downloadedFileInfo, $user, function($uploaded, $total) use ($transferId, $fileInfo, $totalSize) {
+                    $percentage = 50 + ($total > 0 ? ($uploaded / $total) * 50 : 0);
+                    $bytesProgress = (int)($totalSize * $percentage / 100);
+                    StreamProgressController::updateProgress($transferId, $bytesProgress, $totalSize, $fileInfo['filename'], 'uploading');
+                });
+
+                Log::info('[AJAX] Disk-based transfer completed successfully', [
+                    'transfer_id' => $transferId,
+                    'google_drive_id' => $googleDriveFileId,
+                    'filename' => $fileInfo['filename']
+                ]);
+
+                // Increment transfer count after successful upload
+                $user->incrementTransferCount();
+
+                // Mark transfer as complete and store result
+                StreamProgressController::completeTransfer($transferId, true);
+                Cache::put("transfer_result_{$transferId}", [
+                    'success' => true,
+                    'google_drive_id' => $googleDriveFileId,
+                    'filename' => $fileInfo['filename']
+                ], 300);
+
+            } catch (\Exception $e) {
+                Log::error('[AJAX] Disk-based transfer failed', [
+                    'transfer_id' => $transferId,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+
+                // Mark transfer as failed
+                StreamProgressController::completeTransfer($transferId, false);
+                Cache::put("transfer_result_{$transferId}", [
+                    'success' => false,
+                    'error' => $e->getMessage()
+                ], 300);
+            }
+
+            return;
+        }
+
+        // Non-AJAX: use legacy disk-based approach with redirects
+        return $this->transferWithDisk($downloadUrl, $user);
     }
 
 /**
@@ -561,97 +677,108 @@ class TransferController extends Controller
         }
     }
     
-    private function downloadFile($url)
+    private function downloadFile($url, $progressCallback = null)
     {
         Log::info('Starting file download', ['url' => $url]);
-        
+
         // If this is a WeTransfer page URL, get the direct download link first
         if (strpos($url, 'wetransfer.com/downloads') !== false) {
             $url = $this->getDirectDownloadLink($url);
             Log::info('Got direct download link', ['direct_url' => $url]);
         }
-        
+
         // Create temp file path
         $tempDir = storage_path('temp');
         $tempFile = $tempDir . '/' . uniqid('wetransfer_', true) . '.tmp';
-        
+
         // Ensure temp directory exists
         if (!is_dir($tempDir)) {
             mkdir($tempDir, 0755, true);
         }
-        
+
         Log::info('Downloading to temp file', ['temp_file' => $tempFile]);
-        
-        $client = new Client([
+
+        $clientOptions = [
             'headers' => [
                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             ],
             'allow_redirects' => true,
-            'timeout' => 0, // No timeout for streaming downloads
+            'timeout' => 0,
             'read_timeout' => 0,
             'connect_timeout' => 30
-        ]);
-        
+        ];
+
+        // Add progress callback if provided
+        if ($progressCallback) {
+            $clientOptions['progress'] = function($downloadTotal, $downloadedBytes, $uploadTotal, $uploadedBytes) use ($progressCallback) {
+                if ($downloadTotal > 0) {
+                    $progressCallback($downloadedBytes, $downloadTotal);
+                }
+            };
+        }
+
+        $client = new Client($clientOptions);
+
         try {
             // First, get headers to extract filename and validate response
             $headResponse = $client->head($url);
-            
+
             $contentType = $headResponse->getHeader('content-type')[0] ?? 'application/octet-stream';
             $contentLength = $headResponse->getHeader('content-length')[0] ?? 'unknown';
-            
+
             Log::info('Response headers', [
                 'content_type' => $contentType,
                 'content_length' => $contentLength
             ]);
-            
+
             // Check if we got HTML instead of a file
             if (strpos($contentType, 'text/html') !== false) {
                 Log::error('Received HTML content type', ['content_type' => $contentType]);
                 throw new \Exception('Download link appears to return a webpage instead of a file. The link may have expired or be invalid.');
             }
-            
+
             $contentDisposition = $headResponse->getHeader('content-disposition')[0] ?? '';
             preg_match('/filename[^;=\n]*=(([\'"]).*?\2|[^;\n]*)/', $contentDisposition, $matches);
             $filename = isset($matches[1]) ? trim($matches[1], '"\'') : 'downloaded_file';
-            
+
             Log::info('Extracted filename', ['filename' => $filename]);
-            
+
             // Now stream the actual file download
             $resource = fopen($tempFile, 'w');
             if (!$resource) {
                 throw new \Exception('Could not create temporary file for download');
             }
-            
+
             Log::info('Starting streaming download', ['expected_size' => $contentLength]);
-            
+
             $response = $client->get($url, [
                 'sink' => $resource
             ]);
-            
+
             fclose($resource);
-            
+
             $actualSize = filesize($tempFile);
             Log::info('File streamed to disk', ['size_bytes' => $actualSize, 'temp_file' => $tempFile]);
-            
+
             // Validate download completed successfully
             if ($contentLength !== 'unknown' && $actualSize != intval($contentLength)) {
                 unlink($tempFile); // Cleanup incomplete file
                 throw new \Exception("Download incomplete. Expected {$contentLength} bytes, got {$actualSize} bytes.");
             }
-            
+
             return [
                 'temp_file' => $tempFile,
                 'filename' => $filename,
                 'mimeType' => $contentType,
                 'size' => $actualSize
             ];
-            
+
         } catch (\Exception $e) {
             // Cleanup temp file on error
             if (file_exists($tempFile)) {
                 unlink($tempFile);
             }
-            
+
             Log::error('File download failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -660,7 +787,7 @@ class TransferController extends Controller
         }
     }
 
-    private function uploadToGoogleDrive($fileInfo, $user)
+    private function uploadToGoogleDrive($fileInfo, $user, $progressCallback = null)
     {
         Log::info('Starting Google Drive upload', [
             'filename' => $fileInfo['filename'],
@@ -767,26 +894,39 @@ class TransferController extends Controller
                 // Upload file in chunks
                 $status = false;
                 $handle = fopen($tempFile, "rb");
-                
+                $uploaded = 0;
+                $totalSize = $fileInfo['size'];
+
                 while (!$status && !feof($handle)) {
                     $chunk = fread($handle, 1024 * 1024); // 1MB chunks
                     $status = $media->nextChunk($chunk);
+                    $uploaded += strlen($chunk);
+
+                    // Call progress callback if provided
+                    if ($progressCallback && $totalSize > 0) {
+                        $progressCallback($uploaded, $totalSize);
+                    }
                 }
-                
+
                 fclose($handle);
                 $client->setDefer(false);
-                
+
                 $result = $status;
                 
             } else {
                 // For smaller files, use simple upload
                 Log::info('Using simple upload for small file');
-                
+
                 $result = $service->files->create($fileMetadata, [
                     'data' => file_get_contents($tempFile),
                     'mimeType' => $fileInfo['mimeType'],
                     'uploadType' => 'multipart'
                 ]);
+
+                // Call progress callback with 100% for simple upload
+                if ($progressCallback) {
+                    $progressCallback($fileInfo['size'], $fileInfo['size']);
+                }
             }
             
             Log::info('Google Drive upload successful', [

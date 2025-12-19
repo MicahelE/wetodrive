@@ -1051,100 +1051,145 @@
         });
 
         function startProgressMonitoring(transferId) {
-            // Connect to SSE endpoint for progress updates
-            const url = '{{ route("transfer.progress") }}?transfer_id=' + transferId;
-            const eventSource = new EventSource(url);
+            let reconnectAttempts = 0;
+            const maxReconnectAttempts = 10;
+            const reconnectDelay = 2000; // 2 seconds
+            let isComplete = false;
 
-            eventSource.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    updateProgress(data);
-                } catch (e) {
-                    console.error('Error parsing progress data:', e);
-                }
-            };
+            function connect() {
+                const url = '{{ route("transfer.progress") }}?transfer_id=' + transferId;
+                console.log('[DEBUG] SSE connecting to:', url);
+                const eventSource = new EventSource(url);
 
-            eventSource.addEventListener('complete', function(event) {
-                console.log('[DEBUG] SSE complete event received:', event.data);
-                eventSource.close();
+                eventSource.onopen = function() {
+                    console.log('[DEBUG] SSE connection opened');
+                    reconnectAttempts = 0; // Reset on successful connection
+                };
 
-                try {
-                    const data = JSON.parse(event.data);
+                eventSource.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        updateProgress(data);
+                    } catch (e) {
+                        console.error('Error parsing progress data:', e);
+                    }
+                };
 
-                    if (data.status === 'completed' && data.success) {
-                        console.log('[DEBUG] Transfer completed successfully via SSE');
-                        console.log('[DEBUG] Google Drive ID:', data.google_drive_id);
+                eventSource.addEventListener('complete', function(event) {
+                    console.log('[DEBUG] SSE complete event received:', event.data);
+                    isComplete = true;
+                    eventSource.close();
 
-                        // Update UI to show completion
-                        document.getElementById('progressBar').style.width = '100%';
-                        document.getElementById('progressPercent').textContent = '100%';
-                        document.getElementById('progressStatus').textContent = 'Transfer Complete!';
-                        document.getElementById('statusMessage').style.display = 'none';
-                        document.getElementById('completionMessage').style.display = 'block';
+                    try {
+                        const data = JSON.parse(event.data);
 
-                        // Build success message with Google Drive link
-                        let successHtml = `
-                            <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px;">
-                                <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">✅ Transfer Successful!</div>
-                                <div style="margin-bottom: 10px;">Your file has been transferred to Google Drive.</div>`;
+                        if (data.status === 'completed' && data.success) {
+                            console.log('[DEBUG] Transfer completed successfully via SSE');
+                            console.log('[DEBUG] Google Drive ID:', data.google_drive_id);
 
-                        if (data.google_drive_id) {
+                            // Update UI to show completion
+                            document.getElementById('progressBar').style.width = '100%';
+                            document.getElementById('progressPercent').textContent = '100%';
+                            document.getElementById('progressStatus').textContent = 'Transfer Complete!';
+                            document.getElementById('statusMessage').style.display = 'none';
+                            document.getElementById('completionMessage').style.display = 'block';
+
+                            // Build success message with Google Drive link
+                            let successHtml = `
+                                <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px;">
+                                    <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Transfer Successful!</div>
+                                    <div style="margin-bottom: 10px;">Your file has been transferred to Google Drive.</div>`;
+
+                            if (data.google_drive_id) {
+                                successHtml += `
+                                    <a href="https://drive.google.com/file/d/${data.google_drive_id}/view" target="_blank"
+                                       style="display: inline-block; background: #4285f4; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-bottom: 10px;">
+                                        View in Google Drive
+                                    </a><br>`;
+                            }
+
                             successHtml += `
-                                <a href="https://drive.google.com/file/d/${data.google_drive_id}/view" target="_blank"
-                                   style="display: inline-block; background: #4285f4; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-bottom: 10px;">
-                                    📁 View in Google Drive
-                                </a><br>`;
-                        }
+                                    <button onclick="resetTransferForm()" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                        Transfer Another File
+                                    </button>
+                                </div>`;
 
-                        successHtml += `
-                                <button onclick="resetTransferForm()" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
-                                    Transfer Another File
-                                </button>
-                            </div>`;
+                            document.getElementById('completionMessage').innerHTML = successHtml;
 
-                        document.getElementById('completionMessage').innerHTML = successHtml;
-
-                        // Update transfer counts in UI
-                        const transfersRemainingEl = document.querySelector('[data-transfers-remaining]');
-                        if (transfersRemainingEl) {
-                            const current = parseInt(transfersRemainingEl.textContent);
-                            if (!isNaN(current) && current > 0) {
-                                transfersRemainingEl.textContent = current - 1;
+                            // Update transfer counts in UI
+                            const transfersRemainingEl = document.querySelector('[data-transfers-remaining]');
+                            if (transfersRemainingEl) {
+                                const current = parseInt(transfersRemainingEl.textContent);
+                                if (!isNaN(current) && current > 0) {
+                                    transfersRemainingEl.textContent = current - 1;
+                                }
                             }
-                        }
 
-                        const totalTransfersEl = document.querySelector('[data-total-transfers]');
-                        if (totalTransfersEl) {
-                            const current = parseInt(totalTransfersEl.textContent);
-                            if (!isNaN(current)) {
-                                totalTransfersEl.textContent = current + 1;
+                            const totalTransfersEl = document.querySelector('[data-total-transfers]');
+                            if (totalTransfersEl) {
+                                const current = parseInt(totalTransfersEl.textContent);
+                                if (!isNaN(current)) {
+                                    totalTransfersEl.textContent = current + 1;
+                                }
                             }
+
+                        } else if (data.status === 'failed') {
+                            console.error('[DEBUG] Transfer failed via SSE:', data.error);
+
+                            document.getElementById('progressStatus').textContent = 'Transfer Failed';
+                            document.getElementById('statusMessage').style.display = 'none';
+                            document.getElementById('completionMessage').style.display = 'block';
+                            document.getElementById('completionMessage').innerHTML = `
+                                <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 8px;">
+                                    <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Transfer Failed</div>
+                                    <div style="margin-bottom: 10px;">${data.error || 'An error occurred during the transfer.'}</div>
+                                    <button onclick="resetTransferForm()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                        Try Again
+                                    </button>
+                                </div>`;
                         }
+                    } catch (e) {
+                        console.error('[DEBUG] Error parsing complete event data:', e);
+                    }
+                });
 
-                    } else if (data.status === 'failed') {
-                        console.error('[DEBUG] Transfer failed via SSE:', data.error);
+                eventSource.onerror = function(error) {
+                    console.error('[DEBUG] SSE connection error:', error);
+                    eventSource.close();
 
-                        document.getElementById('progressStatus').textContent = 'Transfer Failed';
+                    // Don't reconnect if transfer is already complete
+                    if (isComplete) {
+                        return;
+                    }
+
+                    // Attempt reconnection
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        console.log('[DEBUG] SSE reconnecting (' + reconnectAttempts + '/' + maxReconnectAttempts + ') in ' + (reconnectDelay/1000) + 's...');
+                        document.getElementById('progressStatus').textContent = 'Reconnecting... (' + reconnectAttempts + '/' + maxReconnectAttempts + ')';
+
+                        setTimeout(function() {
+                            connect();
+                        }, reconnectDelay);
+                    } else {
+                        console.error('[DEBUG] Max SSE reconnect attempts reached');
+                        document.getElementById('progressStatus').textContent = 'Connection lost';
                         document.getElementById('statusMessage').style.display = 'none';
                         document.getElementById('completionMessage').style.display = 'block';
                         document.getElementById('completionMessage').innerHTML = `
-                            <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 8px;">
-                                <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">❌ Transfer Failed</div>
-                                <div style="margin-bottom: 10px;">${data.error || 'An error occurred during the transfer.'}</div>
-                                <button onclick="resetTransferForm()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
-                                    Try Again
+                            <div style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 15px; border-radius: 8px;">
+                                <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Connection Lost</div>
+                                <div style="margin-bottom: 10px;">Lost connection to the server. Your transfer may still be completing in the background. Check your Google Drive in a few minutes.</div>
+                                <button onclick="resetTransferForm()" style="background: #ffc107; color: #212529; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                    Start New Transfer
                                 </button>
                             </div>`;
                     }
-                } catch (e) {
-                    console.error('[DEBUG] Error parsing complete event data:', e);
-                }
-            });
+                };
+            }
 
-            eventSource.onerror = function(error) {
-                console.error('SSE connection error:', error);
-                eventSource.close();
-            };
+            // Start initial connection
+            connect();
 
             // Alternative implementation using fetch (if EventSource doesn't work)
             /*
