@@ -1134,19 +1134,35 @@
                             }
 
                         } else if (data.status === 'failed') {
-                            console.error('[DEBUG] Transfer failed via SSE:', data.error);
+                            console.error('[DEBUG] Transfer failed via SSE:', data.error, 'needs_reconnect:', data.needs_reconnect);
 
-                            document.getElementById('progressStatus').textContent = 'Transfer Failed';
                             document.getElementById('statusMessage').style.display = 'none';
                             document.getElementById('completionMessage').style.display = 'block';
-                            document.getElementById('completionMessage').innerHTML = `
-                                <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 8px;">
-                                    <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Transfer Failed</div>
-                                    <div style="margin-bottom: 10px;">${data.error || 'An error occurred during the transfer.'}</div>
-                                    <button onclick="resetTransferForm()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
-                                        Try Again
-                                    </button>
-                                </div>`;
+
+                            if (data.needs_reconnect) {
+                                document.getElementById('progressStatus').textContent = 'Reconnection Required';
+                                document.getElementById('completionMessage').innerHTML = `
+                                    <div style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 15px; border-radius: 8px;">
+                                        <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Reconnection Required</div>
+                                        <div style="margin-bottom: 10px;">${data.error || 'Your Google Drive connection needs to be refreshed.'}</div>
+                                        <form id="reconnect-form" action="{{ route('auth.disconnect') }}" method="POST" style="display: inline;">
+                                            @csrf
+                                            <button type="submit" style="background: #4285f4; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                                Reconnect to Google Drive
+                                            </button>
+                                        </form>
+                                    </div>`;
+                            } else {
+                                document.getElementById('progressStatus').textContent = 'Transfer Failed';
+                                document.getElementById('completionMessage').innerHTML = `
+                                    <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 8px;">
+                                        <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Transfer Failed</div>
+                                        <div style="margin-bottom: 10px;">${data.error || 'An error occurred during the transfer.'}</div>
+                                        <button onclick="resetTransferForm()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                            Try Again
+                                        </button>
+                                    </div>`;
+                            }
                         }
                     } catch (e) {
                         console.error('[DEBUG] Error parsing complete event data:', e);

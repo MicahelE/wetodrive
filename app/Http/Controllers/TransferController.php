@@ -245,10 +245,21 @@ class TransferController extends Controller
 
                 } catch (\Exception $e) {
                     $errorTime = isset($transferStartTime) ? microtime(true) - $transferStartTime : 0;
+                    $errorMessage = $e->getMessage();
+                    $needsReconnect = false;
+
+                    // Check for insufficient scopes error
+                    if (str_contains($errorMessage, 'insufficient authentication scopes') ||
+                        str_contains($errorMessage, 'ACCESS_TOKEN_SCOPE_INSUFFICIENT') ||
+                        str_contains($errorMessage, 'Insufficient Permission')) {
+                        $errorMessage = 'Your Google Drive connection needs to be refreshed with updated permissions.';
+                        $needsReconnect = true;
+                    }
 
                     Log::error('[AJAX] Background transfer failed', [
                         'transfer_id' => $transferId,
                         'error' => $e->getMessage(),
+                        'needs_reconnect' => $needsReconnect,
                         'error_class' => get_class($e),
                         'error_file' => $e->getFile(),
                         'error_line' => $e->getLine(),
@@ -260,7 +271,8 @@ class TransferController extends Controller
                     StreamProgressController::completeTransfer($transferId, false);
                     Cache::put("transfer_result_{$transferId}", [
                         'success' => false,
-                        'error' => $e->getMessage()
+                        'error' => $errorMessage,
+                        'needs_reconnect' => $needsReconnect
                     ], 300);
                 }
 
@@ -388,9 +400,21 @@ class TransferController extends Controller
                 ], 300);
 
             } catch (\Exception $e) {
+                $errorMessage = $e->getMessage();
+                $needsReconnect = false;
+
+                // Check for insufficient scopes error
+                if (str_contains($errorMessage, 'insufficient authentication scopes') ||
+                    str_contains($errorMessage, 'ACCESS_TOKEN_SCOPE_INSUFFICIENT') ||
+                    str_contains($errorMessage, 'Insufficient Permission')) {
+                    $errorMessage = 'Your Google Drive connection needs to be refreshed with updated permissions.';
+                    $needsReconnect = true;
+                }
+
                 Log::error('[AJAX] Disk-based transfer failed', [
                     'transfer_id' => $transferId,
                     'error' => $e->getMessage(),
+                    'needs_reconnect' => $needsReconnect,
                     'trace' => $e->getTraceAsString()
                 ]);
 
@@ -398,7 +422,8 @@ class TransferController extends Controller
                 StreamProgressController::completeTransfer($transferId, false);
                 Cache::put("transfer_result_{$transferId}", [
                     'success' => false,
-                    'error' => $e->getMessage()
+                    'error' => $errorMessage,
+                    'needs_reconnect' => $needsReconnect
                 ], 300);
             }
 
