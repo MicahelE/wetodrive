@@ -7,6 +7,7 @@ use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use App\Models\User;
+use App\Services\GeoLocationService;
 
 class AuthController extends Controller
 {
@@ -18,28 +19,28 @@ class AuthController extends Controller
             ->redirect();
     }
 
-    public function handleGoogleCallback()
+    public function handleGoogleCallback(Request $request)
     {
         try {
             $googleUser = Socialite::driver('google')->stateless()->user();
-            
+
             Log::info('Google callback received', [
                 'has_token' => !empty($googleUser->token),
                 'has_refresh_token' => !empty($googleUser->refreshToken),
                 'email' => $googleUser->getEmail()
             ]);
-            
+
             // Store the full token response
             $tokenData = [
                 'access_token' => $googleUser->token,
                 'refresh_token' => $googleUser->refreshToken,
                 'expires_in' => $googleUser->expiresIn,
             ];
-            
+
             if (empty($googleUser->refreshToken)) {
                 Log::warning('No refresh token received from Google. User may need to revoke access and re-authenticate.');
             }
-            
+
             $user = User::updateOrCreate([
                 'email' => $googleUser->getEmail(),
             ], [
@@ -48,7 +49,21 @@ class AuthController extends Controller
                 'google_token' => json_encode($tokenData),
                 'google_refresh_token' => $googleUser->refreshToken,
             ]);
-            
+
+            // Detect country if not already set
+            if (empty($user->country_code)) {
+                $geoService = new GeoLocationService();
+                $countryCode = $geoService->getCountryFromRequest($request);
+                if ($countryCode) {
+                    $user->country_code = $countryCode;
+                    $user->save();
+                    Log::info('Country detected during signup', [
+                        'user_id' => $user->id,
+                        'country' => $countryCode
+                    ]);
+                }
+            }
+
             Log::info('User authenticated and saved', [
                 'user_id' => $user->id,
                 'has_refresh_token_saved' => !empty($user->google_refresh_token)
