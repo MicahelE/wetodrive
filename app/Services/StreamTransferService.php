@@ -257,6 +257,16 @@ class StreamTransferService
 
         } catch (\Exception $e) {
             Log::error('Failed to get direct download link', ['error' => $e->getMessage()]);
+
+            // Detect specific WeTransfer errors to provide better user feedback
+            $errorMessage = $e->getMessage();
+            if (str_contains($errorMessage, 'No download access') ||
+                str_contains($errorMessage, '404') ||
+                str_contains($errorMessage, 'expired') ||
+                str_contains($errorMessage, 'not found')) {
+                throw new \Exception('WETRANSFER_EXPIRED:' . $errorMessage);
+            }
+
             throw new \Exception('Failed to get download link from WeTransfer');
         }
     }

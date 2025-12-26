@@ -1031,15 +1031,52 @@
                         document.getElementById('progressStatus').textContent = 'Transfer Failed';
                         document.getElementById('statusMessage').style.display = 'none';
                         document.getElementById('completionMessage').style.display = 'block';
-                        document.getElementById('completionMessage').innerHTML = `
-                            <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 8px;">
-                                <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">❌ Transfer Failed</div>
-                                <div>${error.error || error.message || 'An error occurred while starting the transfer.'}</div>
-                                <button onclick="resetTransferForm()" style="margin-top: 15px; background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
-                                    Try Again
-                                </button>
-                            </div>
-                        `;
+
+                        // Handle different error types with appropriate UX
+                        if (error.is_wetransfer_error) {
+                            // WeTransfer expired/invalid link error - blue info box
+                            let suggestionsHtml = error.suggestions
+                                ? '<ul style="text-align: left; margin: 10px 0; padding-left: 20px;">' +
+                                  error.suggestions.map(s => `<li style="margin: 5px 0;">${s}</li>`).join('') +
+                                  '</ul>'
+                                : '';
+
+                            document.getElementById('completionMessage').innerHTML = `
+                                <div style="background: #e7f3ff; border: 1px solid #b8daff; color: #004085; padding: 15px; border-radius: 8px;">
+                                    <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Link Unavailable</div>
+                                    <div>${error.error || 'This WeTransfer link is no longer available.'}</div>
+                                    ${suggestionsHtml}
+                                    <button onclick="resetTransferForm()" style="margin-top: 10px; background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                        Try Different Link
+                                    </button>
+                                </div>
+                            `;
+                        } else if (error.is_limit_error && error.upgrade_url) {
+                            // File size limit error - yellow warning box with upgrade link
+                            document.getElementById('completionMessage').innerHTML = `
+                                <div style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 15px; border-radius: 8px;">
+                                    <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">File Too Large</div>
+                                    <div style="margin-bottom: 15px;">${error.error || 'File exceeds your plan limit.'}</div>
+                                    <a href="${error.upgrade_url}" style="display: inline-block; background: #28a745; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-right: 10px;">
+                                        Upgrade Plan
+                                    </a>
+                                    <button onclick="resetTransferForm()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                        Try Different File
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            // Generic error - red error box (original behavior)
+                            document.getElementById('completionMessage').innerHTML = `
+                                <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 8px;">
+                                    <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Transfer Failed</div>
+                                    <div>${error.error || error.message || 'An error occurred while starting the transfer.'}</div>
+                                    <button onclick="resetTransferForm()" style="margin-top: 15px; background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                        Try Again
+                                    </button>
+                                </div>
+                            `;
+                        }
                     });
 
                     console.log('[DEBUG] Returning false to prevent default submission');

@@ -88,9 +88,25 @@ class TransferController extends Controller
             ]);
 
             if ($request->ajax()) {
+                $errorMessage = $e->getMessage();
+                $isWeTransferError = str_starts_with($errorMessage, 'WETRANSFER_EXPIRED:');
+
+                if ($isWeTransferError) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'This WeTransfer link appears to be expired, password-protected, or no longer available.',
+                        'is_wetransfer_error' => true,
+                        'suggestions' => [
+                            'Check if the link has expired (WeTransfer links expire after 7 days)',
+                            'Ask the sender for a new link',
+                            'Make sure the link isn\'t password-protected'
+                        ]
+                    ], 410);
+                }
+
                 return response()->json([
                     'success' => false,
-                    'error' => 'Transfer failed: ' . $e->getMessage()
+                    'error' => 'Transfer failed: ' . $errorMessage
                 ], 500);
             }
 
@@ -125,11 +141,26 @@ class TransferController extends Controller
             if (!$this->checkFileSizeLimit($user, $fileInfo['size'])) {
                 $maxSize = $this->getMaxFileSizeForUser($user);
 
-                // For Ajax request, return JSON error
+                Log::warning('File size exceeds user plan limit', [
+                    'user_id' => $user->id,
+                    'user_email' => $user->email,
+                    'subscription_tier' => $user->subscription_tier ?? 'free',
+                    'filename' => $fileInfo['filename'],
+                    'file_size' => $fileInfo['size'],
+                    'file_size_formatted' => $this->formatFileSize($fileInfo['size']),
+                    'max_allowed' => $maxSize,
+                    'max_allowed_formatted' => $this->formatFileSize($maxSize),
+                    'exceeded_by' => $fileInfo['size'] - $maxSize,
+                    'exceeded_by_formatted' => $this->formatFileSize($fileInfo['size'] - $maxSize)
+                ]);
+
+                // For Ajax request, return JSON error with upgrade info
                 if ($request->ajax()) {
                     return response()->json([
                         'success' => false,
-                        'error' => 'File size (' . $this->formatFileSize($fileInfo['size']) . ') exceeds your plan limit of ' . $this->formatFileSize($maxSize) . '.'
+                        'error' => 'File size (' . $this->formatFileSize($fileInfo['size']) . ') exceeds your plan limit of ' . $this->formatFileSize($maxSize) . '.',
+                        'is_limit_error' => true,
+                        'upgrade_url' => route('subscription.pricing')
                     ], 400);
                 }
 
@@ -304,9 +335,25 @@ class TransferController extends Controller
             ]);
 
             if ($request->ajax()) {
+                $errorMessage = $e->getMessage();
+                $isWeTransferError = str_starts_with($errorMessage, 'WETRANSFER_EXPIRED:');
+
+                if ($isWeTransferError) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'This WeTransfer link appears to be expired, password-protected, or no longer available.',
+                        'is_wetransfer_error' => true,
+                        'suggestions' => [
+                            'Check if the link has expired (WeTransfer links expire after 7 days)',
+                            'Ask the sender for a new link',
+                            'Make sure the link isn\'t password-protected'
+                        ]
+                    ], 410); // 410 Gone for expired content
+                }
+
                 return response()->json([
                     'success' => false,
-                    'error' => $e->getMessage()
+                    'error' => $errorMessage
                 ], 500);
             }
 
@@ -459,6 +506,20 @@ class TransferController extends Controller
                 }
 
                 $maxSize = $this->getMaxFileSizeForUser($user);
+
+                Log::warning('File size exceeds user plan limit', [
+                    'user_id' => $user->id,
+                    'user_email' => $user->email,
+                    'subscription_tier' => $user->subscription_tier ?? 'free',
+                    'filename' => $fileInfo['filename'],
+                    'file_size' => $fileInfo['size'],
+                    'file_size_formatted' => $this->formatFileSize($fileInfo['size']),
+                    'max_allowed' => $maxSize,
+                    'max_allowed_formatted' => $this->formatFileSize($maxSize),
+                    'exceeded_by' => $fileInfo['size'] - $maxSize,
+                    'exceeded_by_formatted' => $this->formatFileSize($fileInfo['size'] - $maxSize)
+                ]);
+
                 return redirect()->back()->with('error',
                     'File size (' . $this->formatFileSize($fileInfo['size']) . ') exceeds your plan limit of ' . $this->formatFileSize($maxSize) . '. ' .
                     '<a href="' . route('subscription.pricing') . '" style="color: #4285f4; text-decoration: underline;">Upgrade your plan</a> for larger files.'
