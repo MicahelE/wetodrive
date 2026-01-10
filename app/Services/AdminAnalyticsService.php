@@ -19,16 +19,23 @@ class AdminAnalyticsService
         return UserSubscription::where('status', 'active')->count();
     }
 
-    public function getTotalRevenue(): float
+    public function getTotalRevenue(): array
     {
-        return PaymentTransaction::where('status', 'success')->sum('amount');
+        return PaymentTransaction::where('status', 'success')
+            ->selectRaw('currency, SUM(amount) as total')
+            ->groupBy('currency')
+            ->pluck('total', 'currency')
+            ->toArray();
     }
 
-    public function getMonthlyRevenue(): float
+    public function getMonthlyRevenue(): array
     {
         return PaymentTransaction::where('status', 'success')
             ->where('created_at', '>=', now()->startOfMonth())
-            ->sum('amount');
+            ->selectRaw('currency, SUM(amount) as total')
+            ->groupBy('currency')
+            ->pluck('total', 'currency')
+            ->toArray();
     }
 
     public function getUserGrowth(int $days = 30): array
@@ -51,10 +58,10 @@ class AdminAnalyticsService
 
     public function getRevenueByMonth(int $months = 12): array
     {
-        return PaymentTransaction::selectRaw('DATE_FORMAT(created_at, "%Y-%m") as month, SUM(amount) as revenue')
+        return PaymentTransaction::selectRaw('DATE_FORMAT(created_at, "%Y-%m") as month, currency, SUM(amount) as revenue')
             ->where('status', 'success')
             ->where('created_at', '>=', now()->subMonths($months))
-            ->groupBy('month')
+            ->groupBy('month', 'currency')
             ->orderBy('month')
             ->get()
             ->toArray();
@@ -88,8 +95,8 @@ class AdminAnalyticsService
         return [
             'total_users' => $this->getTotalUsers(),
             'active_subscriptions' => $this->getActiveSubscriptions(),
-            'total_revenue' => $this->getTotalRevenue(),
-            'monthly_revenue' => $this->getMonthlyRevenue(),
+            'revenue_by_currency' => $this->getTotalRevenue(),
+            'monthly_revenue_by_currency' => $this->getMonthlyRevenue(),
             'user_growth' => $this->getUserGrowth(30),
             'subscription_tiers' => $this->getSubscriptionTierDistribution(),
             'revenue_by_month' => $this->getRevenueByMonth(12),

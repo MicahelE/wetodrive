@@ -19,8 +19,12 @@
         <h3>Revenue by Month (Last 12 Months)</h3>
         <div style="height: 200px; display: flex; align-items: end; gap: 2px; margin-top: 15px;">
             @foreach($analytics['revenue_by_month'] as $month)
-                <div style="background: #27ae60; width: 20px; height: {{ max(5, ($month['revenue'] / max(1, $analytics['revenue_by_month']->max('revenue'))) * 150) }}px; border-radius: 2px;" title="{{ $month['month'] }}: ${{ number_format($month['revenue'], 2) }}"></div>
+                <div style="background: {{ $month['currency'] === 'NGN' ? '#27ae60' : '#3498db' }}; width: 20px; height: {{ max(5, ($month['revenue'] / max(1, $analytics['revenue_by_month']->max('revenue'))) * 150) }}px; border-radius: 2px;" title="{{ $month['month'] }} ({{ $month['currency'] }}): {{ $month['currency'] === 'NGN' ? '₦' : '$' }}{{ number_format($month['revenue'], $month['currency'] === 'NGN' ? 0 : 2) }}"></div>
             @endforeach
+        </div>
+        <div style="margin-top: 10px; font-size: 12px; color: #7f8c8d;">
+            <span style="display: inline-block; width: 12px; height: 12px; background: #3498db; border-radius: 2px; margin-right: 5px;"></span> USD
+            <span style="display: inline-block; width: 12px; height: 12px; background: #27ae60; border-radius: 2px; margin-left: 15px; margin-right: 5px;"></span> NGN
         </div>
     </div>
 </div>
@@ -63,8 +67,12 @@
             <div style="color: #7f8c8d; text-transform: uppercase; font-size: 12px;">New Users (30 days)</div>
         </div>
         <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 6px;">
-            <div style="font-size: 1.5rem; font-weight: bold; color: #2c3e50;">${{ number_format($analytics['revenue_by_month']->sum('revenue'), 2) }}</div>
-            <div style="color: #7f8c8d; text-transform: uppercase; font-size: 12px;">Total Revenue (12 months)</div>
+            <div style="font-size: 1.5rem; font-weight: bold; color: #2c3e50;">${{ number_format($analytics['total_revenue_by_currency']['USD'] ?? 0, 2) }}</div>
+            <div style="color: #7f8c8d; text-transform: uppercase; font-size: 12px;">USD Revenue (12 months)</div>
+        </div>
+        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #2c3e50;">₦{{ number_format($analytics['total_revenue_by_currency']['NGN'] ?? 0, 0) }}</div>
+            <div style="color: #7f8c8d; text-transform: uppercase; font-size: 12px;">NGN Revenue (12 months)</div>
         </div>
         <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 6px;">
             <div style="font-size: 1.5rem; font-weight: bold; color: #2c3e50;">{{ $analytics['subscription_distribution']->sum('count') }}</div>

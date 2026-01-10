@@ -16,7 +16,11 @@ class AdminController extends Controller
         $stats = [
             'total_users' => User::count(),
             'active_subscriptions' => UserSubscription::where('status', 'active')->count(),
-            'total_revenue' => PaymentTransaction::where('status', 'success')->sum('amount'),
+            'revenue_by_currency' => PaymentTransaction::where('status', 'success')
+                ->selectRaw('currency, SUM(amount) as total')
+                ->groupBy('currency')
+                ->pluck('total', 'currency')
+                ->toArray(),
             'new_users_this_month' => User::where('created_at', '>=', now()->startOfMonth())->count(),
             'subscription_tiers' => User::select('subscription_tier', DB::raw('count(*) as count'))
                 ->groupBy('subscription_tier')
@@ -142,12 +146,19 @@ class AdminController extends Controller
                 ->orderBy('date')
                 ->get(),
 
-            'revenue_by_month' => PaymentTransaction::selectRaw('DATE_FORMAT(created_at, "%Y-%m") as month, SUM(amount) as revenue')
+            'revenue_by_month' => PaymentTransaction::selectRaw('DATE_FORMAT(created_at, "%Y-%m") as month, currency, SUM(amount) as revenue')
                 ->where('status', 'success')
                 ->where('created_at', '>=', now()->subMonths(12))
-                ->groupBy('month')
+                ->groupBy('month', 'currency')
                 ->orderBy('month')
                 ->get(),
+
+            'total_revenue_by_currency' => PaymentTransaction::where('status', 'success')
+                ->where('created_at', '>=', now()->subMonths(12))
+                ->selectRaw('currency, SUM(amount) as total')
+                ->groupBy('currency')
+                ->pluck('total', 'currency')
+                ->toArray(),
 
             'subscription_distribution' => UserSubscription::selectRaw('subscription_plan_id, COUNT(*) as count')
                 ->with('subscriptionPlan')

@@ -13,8 +13,12 @@
         <div class="value">{{ number_format($stats['active_subscriptions']) }}</div>
     </div>
     <div class="stat-card">
-        <h3>Total Revenue</h3>
-        <div class="value">${{ number_format($stats['total_revenue'], 2) }}</div>
+        <h3>Revenue (USD)</h3>
+        <div class="value">${{ number_format($stats['revenue_by_currency']['USD'] ?? 0, 2) }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>Revenue (NGN)</h3>
+        <div class="value">₦{{ number_format($stats['revenue_by_currency']['NGN'] ?? 0, 0) }}</div>
     </div>
     <div class="stat-card">
         <h3>New Users This Month</h3>
