@@ -30,6 +30,7 @@ class User extends Authenticatable
         'active_subscription_id',
         'total_transfers',
         'last_transfer_at',
+        'has_used_trial_transfer',
     ];
 
     /**
@@ -55,6 +56,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'last_transfer_at' => 'datetime',
+            'has_used_trial_transfer' => 'boolean',
         ];
     }
 
@@ -106,12 +108,27 @@ class User extends Authenticatable
 
     public function incrementTransferCount(): void
     {
+        // Mark trial as used for free tier users on their first transfer
+        if ($this->hasTrialTransferAvailable()) {
+            $this->markTrialTransferUsed();
+        }
+
         $this->increment('total_transfers');
         $this->update(['last_transfer_at' => now()]);
 
         if ($this->hasActiveSubscription()) {
             $this->activeSubscription->incrementTransferCount();
         }
+    }
+
+    public function hasTrialTransferAvailable(): bool
+    {
+        return $this->subscription_tier === 'free' && !$this->has_used_trial_transfer;
+    }
+
+    public function markTrialTransferUsed(): void
+    {
+        $this->update(['has_used_trial_transfer' => true]);
     }
 
     public function isFromNigeria(): bool
