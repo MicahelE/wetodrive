@@ -1061,9 +1061,9 @@ class TransferController extends Controller
             return $user->activeSubscription->subscriptionPlan->max_file_size;
         }
 
-        // Trial transfer: free users get one 5GB transfer
+        // Trial transfer: free users get one 50GB transfer
         if ($user->hasTrialTransferAvailable()) {
-            return 5 * 1024 * 1024 * 1024; // 5GB (Premium limit)
+            return 50 * 1024 * 1024 * 1024; // 50GB trial limit
         }
 
         // Free tier: 100MB
