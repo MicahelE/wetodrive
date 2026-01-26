@@ -77,7 +77,11 @@ class AdminController extends Controller
             'activeSubscription.subscriptionPlan'
         ]);
 
-        return view('admin.users.detail', compact('user'));
+        $transfers = $user->transfers()
+            ->orderBy('transferred_at', 'desc')
+            ->paginate(15);
+
+        return view('admin.users.detail', compact('user', 'transfers'));
     }
 
     public function makeAdmin(Request $request, User $user)

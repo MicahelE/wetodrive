@@ -13,6 +13,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
 use App\Services\StreamTransferService;
 use App\Http\Controllers\StreamProgressController;
+use App\Models\Transfer;
 
 class TransferController extends Controller
 {
@@ -266,6 +267,13 @@ class TransferController extends Controller
                     // Increment transfer count after successful upload
                     $user->incrementTransferCount();
 
+                    // Log the transfer with file size
+                    Transfer::create([
+                        'user_id' => $user->id,
+                        'file_size' => $fileInfo['size'],
+                        'transferred_at' => now(),
+                    ]);
+
                     // Mark transfer as complete and store result
                     StreamProgressController::completeTransfer($transferId, true);
                     Cache::put("transfer_result_{$transferId}", [
@@ -321,6 +329,13 @@ class TransferController extends Controller
 
             // Increment transfer count after successful upload
             $user->incrementTransferCount();
+
+            // Log the transfer with file size
+            Transfer::create([
+                'user_id' => $user->id,
+                'file_size' => $fileInfo['size'],
+                'transferred_at' => now(),
+            ]);
 
             $googleDriveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
             $successMessage = 'File transferred to Google Drive successfully! ' .
@@ -438,6 +453,13 @@ class TransferController extends Controller
                 // Increment transfer count after successful upload
                 $user->incrementTransferCount();
 
+                // Log the transfer with file size
+                Transfer::create([
+                    'user_id' => $user->id,
+                    'file_size' => $fileInfo['size'],
+                    'transferred_at' => now(),
+                ]);
+
                 // Mark transfer as complete and store result
                 StreamProgressController::completeTransfer($transferId, true);
                 Cache::put("transfer_result_{$transferId}", [
@@ -534,6 +556,13 @@ class TransferController extends Controller
 
             // Increment transfer count after successful upload
             $user->incrementTransferCount();
+
+            // Log the transfer with file size
+            Transfer::create([
+                'user_id' => $user->id,
+                'file_size' => $fileInfo['size'],
+                'transferred_at' => now(),
+            ]);
 
             $googleDriveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
             $successMessage = 'File transferred to Google Drive successfully! ' .

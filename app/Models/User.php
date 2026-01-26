@@ -75,6 +75,11 @@ class User extends Authenticatable
         return $this->hasMany(PaymentTransaction::class);
     }
 
+    public function transfers()
+    {
+        return $this->hasMany(Transfer::class);
+    }
+
     public function hasActiveSubscription(): bool
     {
         return $this->activeSubscription && $this->activeSubscription->isActive();

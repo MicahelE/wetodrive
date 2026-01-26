@@ -159,6 +159,33 @@
     @endif
 </div>
 
+<div class="stat-card">
+    <h3>Transfer History</h3>
+    @if($transfers->count() > 0)
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>File Size</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($transfers as $transfer)
+                <tr>
+                    <td>{{ $transfer->transferred_at->format('M j, Y H:i') }}</td>
+                    <td>{{ $transfer->formatted_file_size }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+        <div style="margin-top: 15px;">
+            {{ $transfers->links() }}
+        </div>
+    @else
+        <p>No transfer history</p>
+    @endif
+</div>
+
 <div style="margin-top: 20px;">
     @if($user->role === 'user')
         <form method="POST" action="{{ route('admin.users.make-admin', $user) }}" style="display: inline;">
