@@ -109,9 +109,9 @@
                     </tr>
                     <tr>
                         <td><strong>Storage Duration</strong></td>
-                        <td>7 days</td>
-                        <td>Extended</td>
-                        <td>Extended</td>
+                        <td>3 days</td>
+                        <td>3 days</td>
+                        <td>Unlimited</td>
                     </tr>
                     <tr>
                         <td><strong>Monthly Transfer Limit</strong></td>
@@ -150,7 +150,7 @@
             <p>While WeTransfer is excellent for sending files, receiving and managing files can be cumbersome:</p>
             <ul style="margin: 20px 0; padding-left: 20px;">
                 <li><strong>Manual Downloads:</strong> You must download files to your device first</li>
-                <li><strong>Limited Storage Time:</strong> Files expire after 7-28 days</li>
+                <li><strong>Limited Storage Time:</strong> Files expire after just 3 days (Free/Starter)</li>
                 <li><strong>Device Storage:</strong> Large files take up space on your device</li>
                 <li><strong>Extra Steps:</strong> Download, then upload to your preferred cloud storage</li>
             </ul>
@@ -168,7 +168,7 @@
             <ul style="margin: 20px 0; padding-left: 20px;">
                 <li><strong>Automatic Saving:</strong> Files go straight from WeTransfer to Google Drive</li>
                 <li><strong>No Storage Limits:</strong> Use your existing Google Drive space</li>
-                <li><strong>Permanent Storage:</strong> Files don't expire after 7 days</li>
+                <li><strong>Permanent Storage:</strong> Files don't expire after 3 days</li>
                 <li><strong>Free to Start:</strong> 5 transfers free, then affordable plans</li>
                 <li><strong>No Device Storage:</strong> Files stream directly to Drive</li>
             </ul>
@@ -219,7 +219,7 @@
             <div class="faq-item">
                 <h3 class="faq-question">Is WeTransfer free?</h3>
                 <div class="faq-answer">
-                    <p>Yes, WeTransfer offers a free plan that allows you to send files up to 3GB per transfer with a limit of 10 transfers per month. Files are stored for 7 days. The free plan has limitations on transfer count, storage duration, and features like password protection.</p>
+                    <p>Yes, WeTransfer offers a free plan that allows you to send files up to 3GB per transfer with a limit of 10 transfers per month. Files are stored for only 3 days. The free plan has limitations on transfer count, storage duration, and features like password protection.</p>
                 </div>
             </div>
 
@@ -233,7 +233,7 @@
             <div class="faq-item">
                 <h3 class="faq-question">What's the difference between WeTransfer Free, Starter, and Ultimate?</h3>
                 <div class="faq-answer">
-                    <p>WeTransfer Free allows 3GB transfers with a 10/month limit and 7-day storage. Starter ($6.99/month) adds password protection and 300GB monthly capacity. Ultimate ($25/month) offers unlimited transfers with all features.</p>
+                    <p>WeTransfer Free allows 3GB transfers with a 10/month limit and 3-day storage. Starter ($6.99/month) adds password protection and 300GB monthly capacity but also has 3-day storage. Ultimate ($25/month) offers unlimited transfers with extended storage.</p>
                 </div>
             </div>
 
@@ -247,7 +247,7 @@
             <div class="faq-item">
                 <h3 class="faq-question">How long do WeTransfer files stay available?</h3>
                 <div class="faq-answer">
-                    <p>WeTransfer Free files are available for 7 days, while Pro files can be stored up to 28 days. After this period, files are automatically deleted and cannot be recovered.</p>
+                    <p>WeTransfer Free and Starter files are available for only 3 days. Ultimate plan users can keep transfers active indefinitely. After expiration, files are automatically deleted and cannot be recovered.</p>
                 </div>
             </div>
         </div>

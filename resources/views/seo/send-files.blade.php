@@ -146,7 +146,7 @@
                         <li>Find file on computer</li>
                         <li>Upload to Google Drive manually</li>
                         <li>Delete file from computer</li>
-                        <li>Files expire in 7 days</li>
+                        <li>Files expire in 3 days</li>
                     </ul>
                 </div>
 
@@ -176,7 +176,7 @@
                 <li><strong>WeTransfer Free:</strong> Up to 3GB per transfer, 10 transfers/month</li>
                 <li><strong>WeTransfer Starter ($6.99/month):</strong> Up to 300GB total/month</li>
                 <li><strong>WeTransfer Ultimate ($25/month):</strong> Unlimited transfers</li>
-                <li><strong>Storage Duration:</strong> 7 days (Free) or extended (paid plans)</li>
+                <li><strong>Storage Duration:</strong> 3 days (Free/Starter) or unlimited (Ultimate)</li>
             </ul>
 
             <h3>What if Files Are Too Large?</h3>

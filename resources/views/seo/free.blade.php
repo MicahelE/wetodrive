@@ -111,8 +111,8 @@
 
                 <div class="feature-card limited">
                     <div class="icon">⏰</div>
-                    <h4>7-Day Storage</h4>
-                    <p>Files are available for download for 7 days before automatic deletion</p>
+                    <h4>3-Day Storage</h4>
+                    <p>Files are available for download for only 3 days before automatic deletion</p>
                 </div>
 
                 <div class="feature-card limited">
@@ -128,7 +128,7 @@
                 <ul class="limitations-list">
                     <li><strong>3GB Maximum:</strong> Total file size per transfer cannot exceed 3GB</li>
                     <li><strong>10 Transfers/Month:</strong> Limited to 10 transfers per month (new as of December 2024)</li>
-                    <li><strong>7-Day Expiry:</strong> Files automatically delete after one week</li>
+                    <li><strong>3-Day Expiry:</strong> Files automatically delete after just 3 days</li>
                     <li><strong>No Password Protection:</strong> Anyone with the link can download files</li>
                     <li><strong>No Transfer History:</strong> Can't track or revisit previous transfers</li>
                     <li><strong>No Custom Backgrounds:</strong> Stuck with default WeTransfer branding</li>
@@ -162,9 +162,9 @@
                     </tr>
                     <tr>
                         <td><strong>Storage Duration</strong></td>
-                        <td>7 days</td>
-                        <td>Extended</td>
-                        <td>Extended</td>
+                        <td>3 days</td>
+                        <td>3 days</td>
+                        <td>Unlimited</td>
                     </tr>
                     <tr>
                         <td><strong>Password Protection</strong></td>
@@ -194,7 +194,7 @@
             </table>
 
             <h2>The Biggest Problem with WeTransfer Free</h2>
-            <p>Since December 2024, the most significant limitations are the <strong>10 transfers per month cap</strong> and <strong>7-day expiration</strong>. Here's why this matters:</p>
+            <p>Since December 2024, the most significant limitations are the <strong>10 transfers per month cap</strong> and <strong>3-day expiration</strong>. Here's why this matters:</p>
 
             <ul style="margin: 20px 0; padding-left: 20px;">
                 <li><strong>Only 10 transfers per month</strong>—heavy users hit limits quickly</li>
@@ -207,10 +207,10 @@
 
             <div class="solution-box">
                 <h3>🚀 Solution: WetoDrive for Permanent Storage</h3>
-                <p>Instead of racing against WeTransfer's 7-day clock, use WetoDrive to automatically save files to Google Drive permanently:</p>
+                <p>Instead of racing against WeTransfer's 3-day clock, use WetoDrive to automatically save files to Google Drive permanently:</p>
                 <ul class="solution-benefits">
                     <li>Files saved permanently to your Google Drive</li>
-                    <li>No 7-day expiration—keep files forever</li>
+                    <li>No 3-day expiration—keep files forever</li>
                     <li>No device storage used during transfer</li>
                     <li>Automatic organization in Google Drive</li>
                     <li>Access files from anywhere, anytime</li>
@@ -229,7 +229,7 @@
 
             <h3>Not Ideal For:</h3>
             <ul style="margin: 20px 0; padding-left: 20px;">
-                <li><strong>Important documents:</strong> Risk of losing access after 7 days</li>
+                <li><strong>Important documents:</strong> Risk of losing access after just 3 days</li>
                 <li><strong>Large projects:</strong> Files over 3GB require multiple transfers</li>
                 <li><strong>Ongoing collaboration:</strong> Need access beyond one week</li>
                 <li><strong>Sensitive files:</strong> No password protection available</li>
@@ -246,7 +246,7 @@
             <ol style="margin: 20px 0; padding-left: 20px;">
                 <li><strong>Compress files</strong> when approaching the 3GB limit</li>
                 <li><strong>Use immediately</strong>—don't wait to download important files</li>
-                <li><strong>Inform recipients</strong> about the 7-day deadline</li>
+                <li><strong>Inform recipients</strong> about the 3-day deadline</li>
                 <li><strong>Split large transfers</strong> into multiple 3GB chunks if needed</li>
                 <li><strong>Consider alternatives</strong> for permanent storage needs</li>
             </ol>
@@ -259,28 +259,28 @@
             <div class="faq-item">
                 <h3 class="faq-question">Is WeTransfer completely free?</h3>
                 <div class="faq-answer">
-                    <p>Yes, WeTransfer offers a free plan with no account required. You can send files up to 3GB total per transfer, but you're limited to 10 transfers per month. Files are stored for 7 days.</p>
+                    <p>Yes, WeTransfer offers a free plan with no account required. You can send files up to 3GB total per transfer, but you're limited to 10 transfers per month. Files are stored for only 3 days.</p>
                 </div>
             </div>
 
             <div class="faq-item">
                 <h3 class="faq-question">What are the limitations of WeTransfer free?</h3>
                 <div class="faq-answer">
-                    <p>WeTransfer Free limits include: 3GB maximum per transfer, 10 transfers per month (new as of December 2024), 7-day storage duration, no password protection, no transfer history, and no custom backgrounds.</p>
+                    <p>WeTransfer Free limits include: 3GB maximum per transfer, 10 transfers per month, 3-day storage duration (reduced from 7 days in December 2024), no password protection, no transfer history, and no custom backgrounds.</p>
                 </div>
             </div>
 
             <div class="faq-item">
                 <h3 class="faq-question">How long do WeTransfer free files last?</h3>
                 <div class="faq-answer">
-                    <p>Files sent via WeTransfer Free are available for download for 7 days. After this period, they are automatically deleted and cannot be recovered.</p>
+                    <p>Files sent via WeTransfer Free are available for download for only 3 days. After this period, they are automatically deleted and cannot be recovered.</p>
                 </div>
             </div>
 
             <div class="faq-item">
                 <h3 class="faq-question">Can I extend WeTransfer free storage time?</h3>
                 <div class="faq-answer">
-                    <p>No, WeTransfer Free files automatically expire after 7 days. To keep files longer, upgrade to WeTransfer Starter ($6.99/month) or Ultimate ($25/month) for extended storage, or use WetoDrive to save files permanently to Google Drive.</p>
+                    <p>No, WeTransfer Free files automatically expire after just 3 days. Even Starter plan ($6.99/month) has the same 3-day limit. Only Ultimate ($25/month) offers extended storage, or use WetoDrive to save files permanently to Google Drive.</p>
                 </div>
             </div>
 
@@ -295,7 +295,7 @@
         <!-- Final CTA -->
         <div class="cta-section">
             <h2>💡 Never Lose WeTransfer Files Again</h2>
-            <p>Use WetoDrive to automatically save WeTransfer files to Google Drive permanently. No more 7-day deadlines or lost files.</p>
+            <p>Use WetoDrive to automatically save WeTransfer files to Google Drive permanently. No more 3-day deadlines or lost files.</p>
             <a href="{{ route('auth.google') }}" class="cta-button" onclick="trackCTA('final_cta')">Start Saving Files Forever →</a>
         </div>
     </div>

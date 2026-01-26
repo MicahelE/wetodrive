@@ -195,7 +195,7 @@
                 <li><strong>You upload</strong> files to WeTransfer (time-consuming)</li>
                 <li><strong>Recipient downloads</strong> files to their device (uses device storage)</li>
                 <li><strong>Recipient uploads</strong> files to their preferred cloud storage</li>
-                <li><strong>Files expire</strong> from WeTransfer after 7-28 days</li>
+                <li><strong>Files expire</strong> from WeTransfer after just 3 days (Free/Starter)</li>
                 <li><strong>Device cleanup</strong> required to free up space</li>
             </ol>
 

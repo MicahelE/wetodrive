@@ -93,7 +93,7 @@
                 <div class="problem-box">
                     <h3>Common WeTransfer Problems</h3>
                     <ul>
-                        <li>Files expire after 7 days (free)</li>
+                        <li>Files expire after just 3 days (free/starter)</li>
                         <li>Only 10 transfers per month (free tier)</li>
                         <li>Manual download required</li>
                         <li>Uses device storage space</li>
@@ -266,7 +266,7 @@
                     </tr>
                     <tr>
                         <td><strong>Storage Duration</strong></td>
-                        <td>7-28 days</td>
+                        <td>3 days (Free/Starter)</td>
                         <td class="highlight">Permanent</td>
                         <td>Permanent</td>
                         <td>30 days</td>
@@ -355,7 +355,7 @@
                 <li>Find downloaded files on computer</li>
                 <li>Manually upload to Google Drive or other cloud storage</li>
                 <li>Delete files from device to free up space</li>
-                <li>Hope you did this before the 7-day expiration</li>
+                <li>Hope you did this before the 3-day expiration</li>
             </ol>
 
             <h3>WetoDrive Enhanced Workflow:</h3>
