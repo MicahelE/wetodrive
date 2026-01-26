@@ -76,61 +76,70 @@
     <!-- Main Content -->
     <div class="container">
         <div class="article-header">
-            <h1>WeTransfer Pricing (2025): What's Free, What's Paid — and a Smarter Alternative</h1>
+            <h1>WeTransfer Pricing (2026): What's Free, What's Paid — and a Smarter Alternative</h1>
             <p class="subtitle">Complete breakdown of WeTransfer costs, features, and how WetoDrive offers a better workflow for automatically saving files to Google Drive.</p>
         </div>
 
         <div class="content">
             <h2>WeTransfer Pricing Overview</h2>
-            <p>WeTransfer offers two main plans: a free version with basic features and a Pro subscription with enhanced capabilities. Here's everything you need to know about WeTransfer pricing in 2025.</p>
+            <p>Following their December 2024 acquisition by Bending Spoons, WeTransfer restructured their pricing into three tiers: Free, Starter, and Ultimate. Here's the complete breakdown for 2026.</p>
 
-            <h3>WeTransfer Free vs Pro Comparison</h3>
+            <h3>WeTransfer Plans Comparison</h3>
             <table class="comparison-table">
                 <thead>
                     <tr>
                         <th>Feature</th>
                         <th>WeTransfer Free</th>
-                        <th>WeTransfer Pro</th>
+                        <th>WeTransfer Starter</th>
+                        <th>WeTransfer Ultimate</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
                         <td><strong>Price</strong></td>
                         <td>$0/month</td>
-                        <td>$12/month or $120/year</td>
+                        <td>$6.99/month</td>
+                        <td>$25/month</td>
                     </tr>
                     <tr>
                         <td><strong>File Size Limit</strong></td>
-                        <td>Up to 2GB per transfer</td>
-                        <td>Up to 20GB per transfer</td>
+                        <td>Up to 3GB per transfer</td>
+                        <td>Up to 300GB total/month</td>
+                        <td>Unlimited</td>
                     </tr>
                     <tr>
                         <td><strong>Storage Duration</strong></td>
                         <td>7 days</td>
-                        <td>Up to 28 days</td>
+                        <td>Extended</td>
+                        <td>Extended</td>
                     </tr>
                     <tr>
                         <td><strong>Monthly Transfer Limit</strong></td>
-                        <td>No specific limit</td>
-                        <td>1TB per month</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Storage Space</strong></td>
-                        <td>None (transfer only)</td>
-                        <td>100GB cloud storage</td>
+                        <td>10 transfers/month</td>
+                        <td>10 transfers/month</td>
+                        <td>Unlimited</td>
                     </tr>
                     <tr>
                         <td><strong>Password Protection</strong></td>
                         <td>❌</td>
+                        <td>✅</td>
                         <td>✅</td>
                     </tr>
                     <tr>
                         <td><strong>Custom Backgrounds</strong></td>
                         <td>❌</td>
                         <td>✅</td>
+                        <td>✅</td>
                     </tr>
                     <tr>
                         <td><strong>Transfer History</strong></td>
+                        <td>❌</td>
+                        <td>✅</td>
+                        <td>✅</td>
+                    </tr>
+                    <tr>
+                        <td><strong>All Features</strong></td>
+                        <td>❌</td>
                         <td>❌</td>
                         <td>✅</td>
                     </tr>
@@ -153,7 +162,7 @@
             </div>
 
             <h2>How WetoDrive Saves You Money</h2>
-            <p>Instead of paying $144/year for WeTransfer Pro, use WetoDrive's smart workflow:</p>
+            <p>Instead of paying $300/year for WeTransfer Ultimate, use WetoDrive's smart workflow:</p>
 
             <h3>WetoDrive Benefits:</h3>
             <ul style="margin: 20px 0; padding-left: 20px;">
@@ -164,29 +173,29 @@
                 <li><strong>No Device Storage:</strong> Files stream directly to Drive</li>
             </ul>
 
-            <h2>WeTransfer Pro vs WetoDrive Pro</h2>
+            <h2>WeTransfer Ultimate vs WetoDrive Pro</h2>
             <table class="comparison-table">
                 <thead>
                     <tr>
                         <th>Feature</th>
-                        <th>WeTransfer Pro ($144/year)</th>
-                        <th>WetoDrive Pro ($X/month)</th>
+                        <th>WeTransfer Ultimate ($300/year)</th>
+                        <th>WetoDrive Pro</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
                         <td><strong>File Size Limit</strong></td>
-                        <td>20GB per transfer</td>
-                        <td>2GB per transfer</td>
+                        <td>Unlimited</td>
+                        <td>3GB per transfer (WeTransfer free limit)</td>
                     </tr>
                     <tr>
                         <td><strong>Storage Solution</strong></td>
-                        <td>100GB WeTransfer storage</td>
+                        <td>WeTransfer cloud</td>
                         <td>Your unlimited Google Drive</td>
                     </tr>
                     <tr>
                         <td><strong>File Expiration</strong></td>
-                        <td>28 days maximum</td>
+                        <td>Extended duration</td>
                         <td>Never (stored in Drive)</td>
                     </tr>
                     <tr>
@@ -210,21 +219,21 @@
             <div class="faq-item">
                 <h3 class="faq-question">Is WeTransfer free?</h3>
                 <div class="faq-answer">
-                    <p>Yes, WeTransfer offers a free plan that allows you to send files up to 2GB and store them for 7 days. However, the free plan has limitations on file size, storage duration, and transfer history.</p>
+                    <p>Yes, WeTransfer offers a free plan that allows you to send files up to 3GB per transfer with a limit of 10 transfers per month. Files are stored for 7 days. The free plan has limitations on transfer count, storage duration, and features like password protection.</p>
                 </div>
             </div>
 
             <div class="faq-item">
-                <h3 class="faq-question">How much does WeTransfer Pro cost?</h3>
+                <h3 class="faq-question">How much do WeTransfer paid plans cost?</h3>
                 <div class="faq-answer">
-                    <p>WeTransfer Pro costs $12 per month or $120 per year (2025 pricing). It includes 100GB storage, files up to 20GB, 1TB monthly transfers, and longer storage duration up to 28 days.</p>
+                    <p>WeTransfer Starter costs $6.99/month and includes password protection and up to 300GB total transfers per month. WeTransfer Ultimate costs $25/month with unlimited transfers and all features included.</p>
                 </div>
             </div>
 
             <div class="faq-item">
-                <h3 class="faq-question">What's the difference between WeTransfer Free and Pro?</h3>
+                <h3 class="faq-question">What's the difference between WeTransfer Free, Starter, and Ultimate?</h3>
                 <div class="faq-answer">
-                    <p>WeTransfer Free allows 2GB file transfers stored for 7 days, while Pro offers 20GB files, 100GB storage, 1TB monthly transfers, password protection, and 28-day storage duration.</p>
+                    <p>WeTransfer Free allows 3GB transfers with a 10/month limit and 7-day storage. Starter ($6.99/month) adds password protection and 300GB monthly capacity. Ultimate ($25/month) offers unlimited transfers with all features.</p>
                 </div>
             </div>
 

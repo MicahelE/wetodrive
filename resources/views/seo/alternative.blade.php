@@ -75,7 +75,7 @@
     <!-- Main Content -->
     <div class="container">
         <div class="article-header">
-            <h1>Best WeTransfer Alternative 2025: WetoDrive Automates Google Drive Saves</h1>
+            <h1>Best WeTransfer Alternative 2026: WetoDrive Automates Google Drive Saves</h1>
             <p class="subtitle">Looking for a WeTransfer alternative? WetoDrive automatically saves files from WeTransfer to Google Drive. No downloads, no manual uploads.</p>
         </div>
 
@@ -93,12 +93,13 @@
                 <div class="problem-box">
                     <h3>Common WeTransfer Problems</h3>
                     <ul>
-                        <li>Files expire after 7-28 days</li>
+                        <li>Files expire after 7 days (free)</li>
+                        <li>Only 10 transfers per month (free tier)</li>
                         <li>Manual download required</li>
                         <li>Uses device storage space</li>
                         <li>Extra step to upload to cloud storage</li>
                         <li>No permanent backup</li>
-                        <li>Limited file size (2GB free, 20GB pro)</li>
+                        <li>Limited file size (3GB free)</li>
                     </ul>
                 </div>
 
@@ -258,7 +259,7 @@
                 <tbody>
                     <tr>
                         <td><strong>File Size Limit</strong></td>
-                        <td>2GB (Free) / 20GB (Pro)</td>
+                        <td>3GB (Free, 10/month limit)</td>
                         <td class="highlight">Unlimited (via Google Drive)</td>
                         <td>15GB (Free) / More (Paid)</td>
                         <td>2GB (Free) / 100GB (Paid)</td>
@@ -293,7 +294,7 @@
                     </tr>
                     <tr>
                         <td><strong>Cost</strong></td>
-                        <td>Free / $12/month</td>
+                        <td>Free / $6.99 / $25/month</td>
                         <td class="highlight">Free / Affordable</td>
                         <td>Free / $6/month</td>
                         <td>Free / $20/month</td>
@@ -370,7 +371,8 @@
             <p>When considering WeTransfer alternatives, cost is often a major factor:</p>
 
             <ul style="margin: 20px 0; padding-left: 20px;">
-                <li><strong>WeTransfer Pro:</strong> $144/year for 20GB transfers and 28-day storage</li>
+                <li><strong>WeTransfer Starter:</strong> $84/year for password protection and 300GB/month</li>
+                <li><strong>WeTransfer Ultimate:</strong> $300/year for unlimited transfers</li>
                 <li><strong>Dropbox Transfer:</strong> $240/year for 100GB transfers</li>
                 <li><strong>WetoDrive Pro:</strong> Significantly less expensive for unlimited Google Drive saves</li>
                 <li><strong>Google Drive:</strong> $60/year for 100GB, but requires manual workflow</li>

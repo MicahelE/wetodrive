@@ -88,7 +88,7 @@
                 <div class="feature-card included">
                     <div class="icon">📁</div>
                     <h4>File Transfers</h4>
-                    <p>Send files up to 2GB total per transfer with no account required</p>
+                    <p>Send files up to 3GB total per transfer with no account required</p>
                 </div>
 
                 <div class="feature-card included">
@@ -126,7 +126,8 @@
             <div class="limitations-box">
                 <h3>Important Restrictions to Know</h3>
                 <ul class="limitations-list">
-                    <li><strong>2GB Maximum:</strong> Total file size per transfer cannot exceed 2GB</li>
+                    <li><strong>3GB Maximum:</strong> Total file size per transfer cannot exceed 3GB</li>
+                    <li><strong>10 Transfers/Month:</strong> Limited to 10 transfers per month (new as of December 2024)</li>
                     <li><strong>7-Day Expiry:</strong> Files automatically delete after one week</li>
                     <li><strong>No Password Protection:</strong> Anyone with the link can download files</li>
                     <li><strong>No Transfer History:</strong> Can't track or revisit previous transfers</li>
@@ -136,58 +137,67 @@
                 </ul>
             </div>
 
-            <h2>WeTransfer Free vs Pro Comparison</h2>
+            <h2>WeTransfer Free vs Paid Plans Comparison</h2>
             <table class="comparison-table">
                 <thead>
                     <tr>
                         <th>Feature</th>
                         <th>WeTransfer Free</th>
-                        <th>WeTransfer Pro ($12/month)</th>
+                        <th>Starter ($6.99/month)</th>
+                        <th>Ultimate ($25/month)</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
                         <td><strong>File Size Limit</strong></td>
-                        <td>2GB per transfer</td>
-                        <td>20GB per transfer</td>
+                        <td>3GB per transfer</td>
+                        <td>300GB total/month</td>
+                        <td>Unlimited</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Monthly Transfers</strong></td>
+                        <td>10 transfers/month</td>
+                        <td>10 transfers/month</td>
+                        <td>Unlimited</td>
                     </tr>
                     <tr>
                         <td><strong>Storage Duration</strong></td>
                         <td>7 days</td>
-                        <td>Up to 28 days</td>
+                        <td>Extended</td>
+                        <td>Extended</td>
                     </tr>
                     <tr>
                         <td><strong>Password Protection</strong></td>
                         <td>❌ Not available</td>
+                        <td>✅ Available</td>
                         <td>✅ Available</td>
                     </tr>
                     <tr>
                         <td><strong>Transfer History</strong></td>
                         <td>❌ Not available</td>
                         <td>✅ Full history</td>
+                        <td>✅ Full history</td>
                     </tr>
                     <tr>
                         <td><strong>Custom Backgrounds</strong></td>
                         <td>❌ Default only</td>
                         <td>✅ Custom branding</td>
+                        <td>✅ Custom branding</td>
                     </tr>
                     <tr>
-                        <td><strong>Cloud Storage</strong></td>
-                        <td>❌ None</td>
-                        <td>✅ 100GB included</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Download Notifications</strong></td>
-                        <td>❌ Not available</td>
-                        <td>✅ Full tracking</td>
+                        <td><strong>All Features</strong></td>
+                        <td>❌</td>
+                        <td>❌</td>
+                        <td>✅</td>
                     </tr>
                 </tbody>
             </table>
 
             <h2>The Biggest Problem with WeTransfer Free</h2>
-            <p>The most significant limitation isn't the 2GB size limit—it's the <strong>7-day expiration</strong>. Here's why this matters:</p>
+            <p>Since December 2024, the most significant limitations are the <strong>10 transfers per month cap</strong> and <strong>7-day expiration</strong>. Here's why this matters:</p>
 
             <ul style="margin: 20px 0; padding-left: 20px;">
+                <li><strong>Only 10 transfers per month</strong>—heavy users hit limits quickly</li>
                 <li><strong>Files disappear forever</strong> after one week</li>
                 <li><strong>No extension possible</strong>—even if you need files later</li>
                 <li><strong>Recipients must act fast</strong> or lose access permanently</li>
@@ -220,7 +230,7 @@
             <h3>Not Ideal For:</h3>
             <ul style="margin: 20px 0; padding-left: 20px;">
                 <li><strong>Important documents:</strong> Risk of losing access after 7 days</li>
-                <li><strong>Large projects:</strong> Files over 2GB require multiple transfers</li>
+                <li><strong>Large projects:</strong> Files over 3GB require multiple transfers</li>
                 <li><strong>Ongoing collaboration:</strong> Need access beyond one week</li>
                 <li><strong>Sensitive files:</strong> No password protection available</li>
             </ul>
@@ -234,10 +244,10 @@
             <h2>How to Maximize WeTransfer Free</h2>
             <h3>Tips for Getting the Most Value:</h3>
             <ol style="margin: 20px 0; padding-left: 20px;">
-                <li><strong>Compress files</strong> when approaching the 2GB limit</li>
+                <li><strong>Compress files</strong> when approaching the 3GB limit</li>
                 <li><strong>Use immediately</strong>—don't wait to download important files</li>
                 <li><strong>Inform recipients</strong> about the 7-day deadline</li>
-                <li><strong>Split large transfers</strong> into multiple 2GB chunks if needed</li>
+                <li><strong>Split large transfers</strong> into multiple 3GB chunks if needed</li>
                 <li><strong>Consider alternatives</strong> for permanent storage needs</li>
             </ol>
         </div>
@@ -249,14 +259,14 @@
             <div class="faq-item">
                 <h3 class="faq-question">Is WeTransfer completely free?</h3>
                 <div class="faq-answer">
-                    <p>Yes, WeTransfer offers a completely free plan with no account required. You can send files up to 2GB total per transfer, and files are stored for 7 days.</p>
+                    <p>Yes, WeTransfer offers a free plan with no account required. You can send files up to 3GB total per transfer, but you're limited to 10 transfers per month. Files are stored for 7 days.</p>
                 </div>
             </div>
 
             <div class="faq-item">
                 <h3 class="faq-question">What are the limitations of WeTransfer free?</h3>
                 <div class="faq-answer">
-                    <p>WeTransfer Free limits include: 2GB maximum per transfer, 7-day storage duration, no password protection, no transfer history, and no custom backgrounds.</p>
+                    <p>WeTransfer Free limits include: 3GB maximum per transfer, 10 transfers per month (new as of December 2024), 7-day storage duration, no password protection, no transfer history, and no custom backgrounds.</p>
                 </div>
             </div>
 
@@ -270,14 +280,14 @@
             <div class="faq-item">
                 <h3 class="faq-question">Can I extend WeTransfer free storage time?</h3>
                 <div class="faq-answer">
-                    <p>No, WeTransfer Free files automatically expire after 7 days. To keep files longer, upgrade to WeTransfer Pro (28 days) or use WetoDrive to save files permanently to Google Drive.</p>
+                    <p>No, WeTransfer Free files automatically expire after 7 days. To keep files longer, upgrade to WeTransfer Starter ($6.99/month) or Ultimate ($25/month) for extended storage, or use WetoDrive to save files permanently to Google Drive.</p>
                 </div>
             </div>
 
             <div class="faq-item">
-                <h3 class="faq-question">Is there a daily limit on WeTransfer free?</h3>
+                <h3 class="faq-question">Is there a transfer limit on WeTransfer free?</h3>
                 <div class="faq-answer">
-                    <p>WeTransfer doesn't publish specific daily limits for free users, but they do have fair usage policies. For heavy usage, consider upgrading to Pro or using automation tools like WetoDrive.</p>
+                    <p>Yes, as of December 2024, WeTransfer Free is limited to 10 transfers per month. This was a significant change from the previous unlimited transfers policy. For more transfers, consider upgrading to Starter ($6.99/month) or Ultimate ($25/month for unlimited transfers).</p>
                 </div>
             </div>
         </div>

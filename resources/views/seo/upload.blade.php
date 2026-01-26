@@ -118,8 +118,9 @@
             <div class="file-size-guide">
                 <h3>Upload Limits by Plan</h3>
                 <ul style="margin: 15px 0; padding-left: 20px;">
-                    <li><strong>WeTransfer Free:</strong> Up to 2GB total per transfer</li>
-                    <li><strong>WeTransfer Pro:</strong> Up to 20GB total per transfer</li>
+                    <li><strong>WeTransfer Free:</strong> Up to 3GB total per transfer, 10 transfers/month</li>
+                    <li><strong>WeTransfer Starter ($6.99/month):</strong> Up to 300GB total/month</li>
+                    <li><strong>WeTransfer Ultimate ($25/month):</strong> Unlimited transfers</li>
                     <li><strong>Individual Files:</strong> No specific limit per file, but total must fit within plan limits</li>
                 </ul>
 
@@ -224,7 +225,7 @@
             <div class="faq-item">
                 <h3 class="faq-question">What's the maximum file size for WeTransfer uploads?</h3>
                 <div class="faq-answer">
-                    <p>WeTransfer Free allows uploads up to 2GB total per transfer. WeTransfer Pro increases this limit to 20GB per transfer.</p>
+                    <p>WeTransfer Free allows uploads up to 3GB total per transfer with a 10 transfers/month limit. WeTransfer Starter ($6.99/month) offers 300GB/month, while Ultimate ($25/month) provides unlimited transfers.</p>
                 </div>
             </div>
 
@@ -245,7 +246,7 @@
             <div class="faq-item">
                 <h3 class="faq-question">Why do my WeTransfer uploads keep failing?</h3>
                 <div class="faq-answer">
-                    <p>Common causes include unstable internet connection, files exceeding size limits, or browser issues. Try using Chrome, check your connection, and ensure files are under 2GB (free) or 20GB (Pro).</p>
+                    <p>Common causes include unstable internet connection, files exceeding size limits, hitting your monthly transfer limit, or browser issues. Try using Chrome, check your connection, and ensure files are under 3GB (free). Note that free users are limited to 10 transfers per month.</p>
                 </div>
             </div>
         </div>
