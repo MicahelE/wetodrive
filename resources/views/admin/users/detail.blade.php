@@ -29,7 +29,7 @@
             </tr>
             <tr>
                 <td><strong>Country:</strong></td>
-                <td>{{ $user->country_code ?? 'N/A' }}</td>
+                <td>{{ $user->country_name ?? 'N/A' }}</td>
             </tr>
             <tr>
                 <td><strong>Total Transfers:</strong></td>

@@ -136,6 +136,14 @@ class User extends Authenticatable
         $this->update(['has_used_trial_transfer' => true]);
     }
 
+    public function getCountryNameAttribute(): ?string
+    {
+        if (!$this->country_code) {
+            return null;
+        }
+        return \Locale::getDisplayRegion('-' . $this->country_code, 'en');
+    }
+
     public function isFromNigeria(): bool
     {
         return $this->country_code === 'NG';

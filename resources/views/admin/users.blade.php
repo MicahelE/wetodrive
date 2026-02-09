@@ -52,7 +52,7 @@
                     {{ ucfirst($user->subscription_tier) }}
                 </span>
             </td>
-            <td>{{ $user->country_code ?? 'N/A' }}</td>
+            <td>{{ $user->country_name ?? 'N/A' }}</td>
             <td>{{ number_format($user->total_transfers) }}</td>
             <td>{{ $user->created_at->format('M j, Y') }}</td>
             <td>
