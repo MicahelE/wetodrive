@@ -136,12 +136,31 @@ class User extends Authenticatable
         $this->update(['has_used_trial_transfer' => true]);
     }
 
+    private const COUNTRY_NAMES = [
+        'AF' => 'Afghanistan', 'AL' => 'Albania', 'DZ' => 'Algeria', 'AR' => 'Argentina',
+        'AU' => 'Australia', 'AT' => 'Austria', 'BD' => 'Bangladesh', 'BE' => 'Belgium',
+        'BR' => 'Brazil', 'CA' => 'Canada', 'CL' => 'Chile', 'CN' => 'China',
+        'CO' => 'Colombia', 'CD' => 'Congo (DRC)', 'CZ' => 'Czechia', 'DK' => 'Denmark',
+        'EG' => 'Egypt', 'ET' => 'Ethiopia', 'FI' => 'Finland', 'FR' => 'France',
+        'DE' => 'Germany', 'GH' => 'Ghana', 'GR' => 'Greece', 'HK' => 'Hong Kong',
+        'IN' => 'India', 'ID' => 'Indonesia', 'IR' => 'Iran', 'IQ' => 'Iraq',
+        'IE' => 'Ireland', 'IL' => 'Israel', 'IT' => 'Italy', 'JP' => 'Japan',
+        'KE' => 'Kenya', 'MY' => 'Malaysia', 'MX' => 'Mexico', 'MA' => 'Morocco',
+        'NL' => 'Netherlands', 'NZ' => 'New Zealand', 'NG' => 'Nigeria', 'NO' => 'Norway',
+        'PK' => 'Pakistan', 'PE' => 'Peru', 'PH' => 'Philippines', 'PL' => 'Poland',
+        'PT' => 'Portugal', 'RO' => 'Romania', 'RU' => 'Russia', 'SA' => 'Saudi Arabia',
+        'SG' => 'Singapore', 'ZA' => 'South Africa', 'KR' => 'South Korea', 'ES' => 'Spain',
+        'SE' => 'Sweden', 'CH' => 'Switzerland', 'TW' => 'Taiwan', 'TZ' => 'Tanzania',
+        'TH' => 'Thailand', 'TR' => 'Turkey', 'UA' => 'Ukraine', 'AE' => 'UAE',
+        'GB' => 'United Kingdom', 'US' => 'United States', 'VN' => 'Vietnam',
+    ];
+
     public function getCountryNameAttribute(): ?string
     {
         if (!$this->country_code) {
             return null;
         }
-        return \Locale::getDisplayRegion('-' . $this->country_code, 'en');
+        return self::COUNTRY_NAMES[$this->country_code] ?? $this->country_code;
     }
 
     public function isFromNigeria(): bool
