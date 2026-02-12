@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Mail\SubscriptionActivatedMail;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\UserSubscription;
 use App\Models\PaymentTransaction;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use LemonSqueezy\Laravel\LemonSqueezy;
 
 class LemonSqueezyService
@@ -219,6 +221,12 @@ class LemonSqueezyService
                 'plan' => $plan->name,
                 'order_id' => $orderData['id']
             ]);
+
+            try {
+                Mail::to($user)->send(new SubscriptionActivatedMail($user, $subscription, $plan));
+            } catch (\Exception $mailEx) {
+                Log::warning('Failed to send subscription activated email', ['error' => $mailEx->getMessage()]);
+            }
 
             return true;
 

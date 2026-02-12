@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Mail\SubscriptionActivatedMail;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\UserSubscription;
 use App\Models\PaymentTransaction;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Yabacon\Paystack;
 
 class PaystackService
@@ -181,6 +183,12 @@ class PaystackService
                 'subscription_id' => $subscription->id,
                 'plan' => $plan->name
             ]);
+
+            try {
+                Mail::to($user)->send(new SubscriptionActivatedMail($user, $subscription, $plan));
+            } catch (\Exception $mailEx) {
+                Log::warning('Failed to send subscription activated email', ['error' => $mailEx->getMessage()]);
+            }
 
             return true;
 

@@ -65,6 +65,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/users/{user}', [AdminController::class, 'userDetail'])->name('users.detail');
     Route::post('/users/{user}/make-admin', [AdminController::class, 'makeAdmin'])->name('users.make-admin');
     Route::post('/users/{user}/remove-admin', [AdminController::class, 'removeAdmin'])->name('users.remove-admin');
+    Route::post('/users/{user}/grant-trial', [AdminController::class, 'grantTrial'])->name('users.grant-trial');
     Route::get('/subscriptions', [AdminController::class, 'subscriptions'])->name('subscriptions');
     Route::get('/transactions', [AdminController::class, 'transactions'])->name('transactions');
     Route::get('/analytics', [AdminController::class, 'analytics'])->name('analytics');

@@ -103,6 +103,18 @@ class AdminController extends Controller
         return redirect()->back()->with('success', "{$user->name} has been demoted from admin.");
     }
 
+    public function grantTrial(User $user)
+    {
+        if ($user->activeSubscription) {
+            return redirect()->back()->with('error', 'Trial transfers cannot be granted to users with an active subscription.');
+        }
+
+        $user->has_used_trial_transfer = false;
+        $user->save();
+
+        return redirect()->back()->with('success', "Trial transfer has been granted to {$user->name}.");
+    }
+
     public function subscriptions(Request $request)
     {
         $query = UserSubscription::with(['user', 'subscriptionPlan']);

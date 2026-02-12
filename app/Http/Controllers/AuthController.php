@@ -6,8 +6,10 @@ use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use App\Mail\WelcomeMail;
 use App\Models\User;
 use App\Services\GeoLocationService;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -49,6 +51,11 @@ class AuthController extends Controller
                 'google_token' => json_encode($tokenData),
                 'google_refresh_token' => $googleUser->refreshToken,
             ]);
+
+            // Send welcome email to new users
+            if ($user->wasRecentlyCreated) {
+                Mail::to($user)->send(new WelcomeMail($user));
+            }
 
             // Detect country if not already set
             if (empty($user->country_code)) {

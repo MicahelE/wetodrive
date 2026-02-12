@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\SubscriptionActivatedMail;
+use App\Mail\SubscriptionCancelledMail;
 use App\Models\SubscriptionPlan;
 use App\Services\GeoLocationService;
 use App\Services\PaystackService;
@@ -9,6 +11,7 @@ use App\Services\LemonSqueezyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class SubscriptionController extends Controller
 {
@@ -223,6 +226,12 @@ class SubscriptionController extends Controller
                 'plan' => $plan->name
             ]);
 
+            try {
+                Mail::to($user)->send(new SubscriptionActivatedMail($user, $subscription, $plan));
+            } catch (\Exception $mailEx) {
+                Log::warning('Failed to send subscription activated email', ['error' => $mailEx->getMessage()]);
+            }
+
             return redirect()->route('home')->with('success', 'Subscription activated successfully! You can now enjoy your new plan.');
 
         } catch (\Exception $e) {
@@ -271,6 +280,16 @@ class SubscriptionController extends Controller
             }
 
             if ($success) {
+                try {
+                    Mail::to($user)->send(new SubscriptionCancelledMail(
+                        $user,
+                        $subscription->subscriptionPlan->name,
+                        $subscription->expires_at,
+                    ));
+                } catch (\Exception $mailEx) {
+                    Log::warning('Failed to send subscription cancelled email', ['error' => $mailEx->getMessage()]);
+                }
+
                 return redirect()->back()->with('success', 'Subscription cancelled successfully.');
             } else {
                 return redirect()->back()->with('error', 'Failed to cancel subscription. Please contact support.');

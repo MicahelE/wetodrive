@@ -11,9 +11,12 @@ use Google_Service_Drive;
 use Google_Service_Drive_DriveFile;
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
+use App\Mail\TransferCompleteMail;
+use App\Mail\TransferFailedMail;
 use App\Services\StreamTransferService;
 use App\Http\Controllers\StreamProgressController;
 use App\Models\Transfer;
+use Illuminate\Support\Facades\Mail;
 
 class TransferController extends Controller
 {
@@ -282,6 +285,24 @@ class TransferController extends Controller
                         'filename' => $fileInfo['filename']
                     ], 300);
 
+                    try {
+                        $driveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
+                        Log::info('Sending transfer complete email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+                        Mail::to($user)->send(new TransferCompleteMail(
+                            $user,
+                            $fileInfo['filename'],
+                            $this->formatFileSize($fileInfo['size']),
+                            $driveUrl,
+                        ));
+                        Log::info('Transfer complete email sent', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+                    } catch (\Exception $mailEx) {
+                        Log::warning('Failed to send transfer complete email', [
+                            'error' => $mailEx->getMessage(),
+                            'exception' => get_class($mailEx),
+                            'trace' => $mailEx->getTraceAsString(),
+                        ]);
+                    }
+
                 } catch (\Exception $e) {
                     $errorTime = isset($transferStartTime) ? microtime(true) - $transferStartTime : 0;
                     $errorMessage = $e->getMessage();
@@ -313,6 +334,18 @@ class TransferController extends Controller
                         'error' => $errorMessage,
                         'needs_reconnect' => $needsReconnect
                     ], 300);
+
+                    try {
+                        Log::info('Sending transfer failed email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+                        Mail::to($user)->send(new TransferFailedMail($user, $fileInfo['filename'], $errorMessage));
+                        Log::info('Transfer failed email sent', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+                    } catch (\Exception $mailEx) {
+                        Log::warning('Failed to send transfer failed email', [
+                            'error' => $mailEx->getMessage(),
+                            'exception' => get_class($mailEx),
+                            'trace' => $mailEx->getTraceAsString(),
+                        ]);
+                    }
                 }
 
                 // Response already sent, just return
@@ -338,6 +371,24 @@ class TransferController extends Controller
             ]);
 
             $googleDriveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
+
+            try {
+                Log::info('Sending transfer complete email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+                Mail::to($user)->send(new TransferCompleteMail(
+                    $user,
+                    $fileInfo['filename'],
+                    $this->formatFileSize($fileInfo['size']),
+                    $googleDriveUrl,
+                ));
+                Log::info('Transfer complete email sent', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+            } catch (\Exception $mailEx) {
+                Log::warning('Failed to send transfer complete email', [
+                    'error' => $mailEx->getMessage(),
+                    'exception' => get_class($mailEx),
+                    'trace' => $mailEx->getTraceAsString(),
+                ]);
+            }
+
             $successMessage = 'File transferred to Google Drive successfully! ' .
                 '<a href="' . $googleDriveUrl . '" target="_blank" style="color: #4285f4; text-decoration: underline; font-weight: 600;">📁 View in Google Drive</a>';
 
@@ -468,6 +519,24 @@ class TransferController extends Controller
                     'filename' => $fileInfo['filename']
                 ], 300);
 
+                try {
+                    $driveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
+                    Log::info('Sending transfer complete email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+                    Mail::to($user)->send(new TransferCompleteMail(
+                        $user,
+                        $fileInfo['filename'],
+                        $this->formatFileSize($fileInfo['size']),
+                        $driveUrl,
+                    ));
+                    Log::info('Transfer complete email sent', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+                } catch (\Exception $mailEx) {
+                    Log::warning('Failed to send transfer complete email', [
+                        'error' => $mailEx->getMessage(),
+                        'exception' => get_class($mailEx),
+                        'trace' => $mailEx->getTraceAsString(),
+                    ]);
+                }
+
             } catch (\Exception $e) {
                 $errorMessage = $e->getMessage();
                 $needsReconnect = false;
@@ -494,6 +563,18 @@ class TransferController extends Controller
                     'error' => $errorMessage,
                     'needs_reconnect' => $needsReconnect
                 ], 300);
+
+                try {
+                    Log::info('Sending transfer failed email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+                    Mail::to($user)->send(new TransferFailedMail($user, $fileInfo['filename'], $errorMessage));
+                    Log::info('Transfer failed email sent', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+                } catch (\Exception $mailEx) {
+                    Log::warning('Failed to send transfer failed email', [
+                        'error' => $mailEx->getMessage(),
+                        'exception' => get_class($mailEx),
+                        'trace' => $mailEx->getTraceAsString(),
+                    ]);
+                }
             }
 
             return;
@@ -565,6 +646,24 @@ class TransferController extends Controller
             ]);
 
             $googleDriveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
+
+            try {
+                Log::info('Sending transfer complete email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+                Mail::to($user)->send(new TransferCompleteMail(
+                    $user,
+                    $fileInfo['filename'],
+                    $this->formatFileSize($fileInfo['size']),
+                    $googleDriveUrl,
+                ));
+                Log::info('Transfer complete email sent', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
+            } catch (\Exception $mailEx) {
+                Log::warning('Failed to send transfer complete email', [
+                    'error' => $mailEx->getMessage(),
+                    'exception' => get_class($mailEx),
+                    'trace' => $mailEx->getTraceAsString(),
+                ]);
+            }
+
             $successMessage = 'File transferred to Google Drive successfully! ' .
                 '<a href="' . $googleDriveUrl . '" target="_blank" style="color: #4285f4; text-decoration: underline; font-weight: 600;">📁 View in Google Drive</a>';
 
