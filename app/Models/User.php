@@ -31,6 +31,7 @@ class User extends Authenticatable
         'total_transfers',
         'last_transfer_at',
         'has_used_trial_transfer',
+        'check_in_email_sent',
     ];
 
     /**
@@ -57,6 +58,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'last_transfer_at' => 'datetime',
             'has_used_trial_transfer' => 'boolean',
+            'check_in_email_sent' => 'boolean',
         ];
     }
 

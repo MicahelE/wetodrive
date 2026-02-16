@@ -13,6 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('subscriptions:notify-expiring --days=3')->dailyAt('09:00');
+        $schedule->command('emails:send-check-ins')->dailyAt('10:00');
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
