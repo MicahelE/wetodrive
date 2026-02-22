@@ -1,7 +1,7 @@
 <x-mail::message>
 # Hey {{ str($user->name)->before(' ') }},
 
-It's been about a week since you signed up for WeToDrive, and I just wanted to check in.
+It's been a while since you signed up for WeToDrive, and I just wanted to check in.
 
 I'd love to hear how things are going:
 
