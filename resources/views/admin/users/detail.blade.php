@@ -188,7 +188,7 @@
 
 <div style="margin-top: 20px;">
     @if(!$user->activeSubscription)
-        <form method="POST" action="{{ route('admin.users.grant-trial', $user) }}" style="display: inline;" onsubmit="return confirm('Grant a free trial transfer (50GB) to this user?')">
+        <form method="POST" action="{{ route('admin.users.grant-trial', $user) }}" style="display: inline;" onsubmit="return confirm('Grant a free trial transfer (10GB) to this user?')">
             @csrf
             <button type="submit" class="btn btn-info">
                 Grant Trial{{ $user->has_used_trial_transfer ? '' : ' (Already Available)' }}

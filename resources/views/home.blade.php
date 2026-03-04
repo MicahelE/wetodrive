@@ -730,6 +730,12 @@
                 <div style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 8px 20px rgba(0,0,0,0.1);">
                     <h2 style="margin-bottom: 20px; color: #333;">🔗 Transfer WeTransfer Files</h2>
 
+                    @if(Auth::user()->hasTrialTransferAvailable())
+                        <div style="background: linear-gradient(135deg, #e8f5e9, #c8e6c9); border: 1px solid #a5d6a7; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; color: #2e7d32; font-weight: 500; text-align: center;">
+                            Your first transfer supports files up to 10GB!
+                        </div>
+                    @endif
+
                     <!-- Transfer Form -->
                     <div id="transferFormContainer">
                         <form id="transferForm" method="POST" action="{{ route('transfer') }}" class="transfer-form">

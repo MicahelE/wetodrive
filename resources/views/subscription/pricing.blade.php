@@ -555,6 +555,10 @@
         @endif
 
 
+        <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 12px; padding: 16px 24px; text-align: center; margin-bottom: 30px; color: white; font-size: 1.1rem;">
+            Try your first transfer free — up to 10GB, no credit card needed
+        </div>
+
         <div class="pricing-grid">
             @foreach($plans as $plan)
                 <div class="pricing-card {{ $plan->slug === 'pro' ? 'popular' : '' }}">
@@ -582,6 +586,9 @@
                         @foreach($plan->features as $feature)
                             <li>{{ $feature }}</li>
                         @endforeach
+                        @if($plan->slug === 'free')
+                            <li><strong>First transfer supports files up to 10GB</strong></li>
+                        @endif
                     </ul>
 
                     @auth
