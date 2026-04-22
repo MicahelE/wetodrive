@@ -17,7 +17,8 @@
             <select name="provider" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                 <option value="">All Providers</option>
                 <option value="paystack" {{ request('provider') === 'paystack' ? 'selected' : '' }}>Paystack</option>
-                <option value="lemonsqueezy" {{ request('provider') === 'lemonsqueezy' ? 'selected' : '' }}>LemonSqueezy</option>
+                <option value="polar" {{ request('provider') === 'polar' ? 'selected' : '' }}>Polar.sh</option>
+                <option value="lemonsqueezy" {{ request('provider') === 'lemonsqueezy' ? 'selected' : '' }}>LemonSqueezy (legacy)</option>
             </select>
             <button type="submit" class="btn btn-primary">Filter</button>
         </form>

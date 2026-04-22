@@ -376,7 +376,7 @@
                             <p>We accept different payment methods based on your location:</p>
                             <ul>
                                 <li><strong>Nigeria:</strong> Paystack (cards, bank transfer, USSD)</li>
-                                <li><strong>International:</strong> Credit/debit cards via LemonSqueezy</li>
+                                <li><strong>International:</strong> Credit/debit cards via Polar.sh</li>
                             </ul>
                             <p>Payment provider is automatically selected based on your location.</p>
                         </div>

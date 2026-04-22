@@ -289,7 +289,7 @@
                     <li>Payment transaction IDs</li>
                     <li>Billing country (determined by IP address)</li>
                 </ul>
-                <p><strong>Note:</strong> We do not store credit card numbers or banking information. All payment processing is handled by secure third-party providers (Paystack or LemonSqueezy).</p>
+                <p><strong>Note:</strong> We do not store credit card numbers or banking information. All payment processing is handled by secure third-party providers (Paystack or Polar.sh).</p>
 
                 <h3>Technical Information</h3>
                 <p>We automatically collect:</p>

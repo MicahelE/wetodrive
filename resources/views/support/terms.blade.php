@@ -370,7 +370,7 @@
                 <ul>
                     <li><strong>Google Drive:</strong> For file storage</li>
                     <li><strong>WeTransfer:</strong> As the source of file transfers</li>
-                    <li><strong>Payment Processors:</strong> Paystack and LemonSqueezy</li>
+                    <li><strong>Payment Processors:</strong> Paystack and Polar.sh</li>
                 </ul>
                 <p>
                     Your use of these third-party services is subject to their respective terms of service and privacy policies.

@@ -161,6 +161,6 @@ class GeoLocationService
     public function getPaymentProvider($request, $user = null): string
     {
         $country = $this->getUserCountry($request, $user);
-        return $country === 'NG' ? 'paystack' : 'lemonsqueezy';
+        return $country === 'NG' ? 'paystack' : 'polar';
     }
 }

@@ -172,7 +172,7 @@ class User extends Authenticatable
 
     public function getPreferredPaymentProvider(): string
     {
-        return $this->isFromNigeria() ? 'paystack' : 'lemonsqueezy';
+        return $this->isFromNigeria() ? 'paystack' : 'polar';
     }
 
     public function isAdmin(): bool

@@ -639,7 +639,7 @@
             @if($paymentProvider === 'paystack')
                 <span>Paystack</span>
             @else
-                <span>LemonSqueezy</span>
+                <span>Polar.sh</span>
             @endif
         </div>
     </div>
@@ -675,7 +675,7 @@
             userCountry: '{{ $userCountry }}',
             paymentProvider: '{{ $paymentProvider }}',
             countryName: '{{ $userCountry === 'NG' ? 'Nigeria' : 'International' }}',
-            paymentService: '{{ $paymentProvider === 'paystack' ? 'Paystack' : 'LemonSqueezy' }}'
+            paymentService: '{{ $paymentProvider === 'paystack' ? 'Paystack' : 'Polar.sh' }}'
         });
     </script>
 

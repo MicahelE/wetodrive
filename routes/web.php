@@ -52,11 +52,11 @@ Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade'])
 
 // Payment provider callbacks
 Route::get('/paystack/callback', [SubscriptionController::class, 'paystackCallback'])->name('paystack.callback');
-Route::get('/lemonsqueezy/success', [SubscriptionController::class, 'lemonSqueezySuccess'])->name('lemonsqueezy.success');
+Route::get('/polar/success', [SubscriptionController::class, 'polarSuccess'])->name('polar.success');
 
 // Webhooks (no middleware - external providers)
 Route::post('/webhooks/paystack', [SubscriptionController::class, 'paystackWebhook'])->name('webhooks.paystack');
-Route::post('/webhooks/lemonsqueezy', [SubscriptionController::class, 'lemonSqueezyWebhook'])->name('webhooks.lemonsqueezy');
+Route::post('/webhooks/polar', [SubscriptionController::class, 'polarWebhook'])->name('webhooks.polar');
 
 // Admin routes
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
