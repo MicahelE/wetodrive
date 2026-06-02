@@ -15,9 +15,14 @@ class AdminController extends Controller
     {
         $stats = [
             'total_users' => User::count(),
-            'active_subscriptions' => UserSubscription::where('status', 'active')->count(),
+            'active_subscriptions' => UserSubscription::currentlyActive()->count(),
             'revenue_by_currency' => PaymentTransaction::where('status', 'success')
                 ->selectRaw('currency, SUM(amount) as total')
+                ->groupBy('currency')
+                ->pluck('total', 'currency')
+                ->toArray(),
+            'active_revenue_by_currency' => UserSubscription::currentlyActive()
+                ->selectRaw('currency, SUM(amount_paid) as total')
                 ->groupBy('currency')
                 ->pluck('total', 'currency')
                 ->toArray(),
@@ -178,7 +183,7 @@ class AdminController extends Controller
 
             'subscription_distribution' => UserSubscription::selectRaw('subscription_plan_id, COUNT(*) as count')
                 ->with('subscriptionPlan')
-                ->where('status', 'active')
+                ->currentlyActive()
                 ->groupBy('subscription_plan_id')
                 ->get(),
 

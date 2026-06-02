@@ -109,6 +109,11 @@ class UserSubscription extends Model
         ]);
     }
 
+    public function expire(): void
+    {
+        $this->update(['status' => 'expired']);
+    }
+
     public function getFormattedAmount(): string
     {
         return $this->currency === 'NGN'
@@ -119,6 +124,14 @@ class UserSubscription extends Model
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
+    }
+
+    public function scopeCurrentlyActive($query)
+    {
+        return $query->where('status', 'active')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            });
     }
 
     public function scopeForProvider($query, string $provider)

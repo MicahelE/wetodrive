@@ -218,10 +218,7 @@ class PolarService
 
         if ($subscription) {
             $subscription->cancel();
-            $subscription->user?->update([
-                'active_subscription_id' => null,
-                'subscription_tier' => 'free',
-            ]);
+            $subscription->user?->downgradeToFree();
 
             Log::info('Polar subscription revoked', [
                 'subscription_id' => $subscription->id,

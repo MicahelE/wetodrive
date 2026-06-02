@@ -87,6 +87,14 @@ class User extends Authenticatable
         return $this->activeSubscription && $this->activeSubscription->isActive();
     }
 
+    public function downgradeToFree(): void
+    {
+        $this->update([
+            'active_subscription_id' => null,
+            'subscription_tier' => 'free',
+        ]);
+    }
+
     public function getEffectiveSubscription(): ?UserSubscription
     {
         // Return active subscription if exists, otherwise check for free tier
