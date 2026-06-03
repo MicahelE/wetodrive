@@ -21,6 +21,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
         ]);
 
+        // App authenticates via Google OAuth only (no 'login' route), so send
+        // unauthenticated visitors to the home page where the sign-in lives.
+        $middleware->redirectGuestsTo(fn () => route('home'));
+
         $middleware->validateCsrfTokens(except: [
             'webhooks/polar',
             'webhooks/paystack',
