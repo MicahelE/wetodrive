@@ -28,6 +28,9 @@ class TransferController extends Controller
     public function transfer(Request $request)
     {
         set_time_limit(0); // No time limit for streaming large files
+        // PHP-FPM defaults to 128M, which the 10MB chunk buffer + Google SDK
+        // upload layer can exceed on large files (see StreamTransferService).
+        ini_set('memory_limit', '512M');
 
         $request->validate([
             'wetransfer_url' => 'required|url',

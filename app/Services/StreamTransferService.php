@@ -59,6 +59,11 @@ class StreamTransferService
      */
     public function streamTransfer(string $downloadUrl, array $fileInfo, $user, string $transferId = null): string
     {
+        // Guarantee headroom for the chunk buffer + Google upload layer even
+        // when invoked outside the controller entry point (FPM default is 128M,
+        // which crashed large transfers at the buffer concat in streamToGoogleDrive).
+        ini_set('memory_limit', '512M');
+
         Log::info('Starting streaming transfer', [
             'download_url' => $downloadUrl,
             'filename' => $fileInfo['filename'],
@@ -229,46 +234,81 @@ class StreamTransferService
             $requestBody['csrf_token'] = $csrfToken;
         }
 
-        try {
-            $apiResponse = $client->post($apiUrl, [
-                'json' => $requestBody,
-                'headers' => $headers
-            ]);
+        // WeTransfer occasionally returns transient 5xx / connection errors, so
+        // retry those with a short backoff. A 4xx (403 Forbidden / 404 / 410),
+        // however, means the link is expired, password-protected, or invalid —
+        // retrying never helps, so fail fast with the user-friendly signal.
+        $maxAttempts = 3;
+        $lastException = null;
 
-            $responseData = json_decode($apiResponse->getBody()->getContents(), true);
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $apiResponse = $client->post($apiUrl, [
+                    'json' => $requestBody,
+                    'headers' => $headers
+                ]);
 
-            // Check for download URL in response
-            $downloadUrl = $responseData['direct_link']
-                ?? $responseData['download_url']
-                ?? $responseData['fields']['download_url']
-                ?? $responseData['presigned_url']
-                ?? null;
+                $responseData = json_decode($apiResponse->getBody()->getContents(), true);
 
-            if ($downloadUrl) {
-                Log::info('Got direct download URL', ['url' => $downloadUrl]);
-                return $downloadUrl;
+                // Check for download URL in response
+                $downloadUrl = $responseData['direct_link']
+                    ?? $responseData['download_url']
+                    ?? $responseData['fields']['download_url']
+                    ?? $responseData['presigned_url']
+                    ?? null;
+
+                if ($downloadUrl) {
+                    Log::info('Got direct download URL', ['url' => $downloadUrl]);
+                    return $downloadUrl;
+                }
+
+                // Fallback URL
+                $fallbackUrl = "https://download.wetransfer.com/eugv/{$transferId}/{$securityHash}";
+                Log::info('Using fallback URL', ['url' => $fallbackUrl]);
+
+                return $fallbackUrl;
+
+            } catch (\Throwable $e) {
+                $lastException = $e;
+                $statusCode = ($e instanceof \GuzzleHttp\Exception\RequestException && $e->hasResponse())
+                    ? $e->getResponse()->getStatusCode()
+                    : 0;
+
+                // Client-side status (expired / forbidden / gone) — terminal.
+                if ($statusCode >= 400 && $statusCode < 500) {
+                    Log::warning('WeTransfer download link unavailable', [
+                        'status' => $statusCode,
+                        'transfer_id' => $transferId,
+                    ]);
+                    throw new \Exception("WETRANSFER_EXPIRED:HTTP {$statusCode} from WeTransfer");
+                }
+
+                // Transient (network or 5xx) — back off and retry.
+                Log::warning('WeTransfer download request failed, retrying', [
+                    'attempt' => $attempt,
+                    'status' => $statusCode,
+                    'error' => $e->getMessage(),
+                ]);
+
+                if ($attempt < $maxAttempts) {
+                    sleep($attempt); // 1s, then 2s
+                }
             }
-
-            // Fallback URL
-            $fallbackUrl = "https://download.wetransfer.com/eugv/{$transferId}/{$securityHash}";
-            Log::info('Using fallback URL', ['url' => $fallbackUrl]);
-
-            return $fallbackUrl;
-
-        } catch (\Exception $e) {
-            Log::error('Failed to get direct download link', ['error' => $e->getMessage()]);
-
-            // Detect specific WeTransfer errors to provide better user feedback
-            $errorMessage = $e->getMessage();
-            if (str_contains($errorMessage, 'No download access') ||
-                str_contains($errorMessage, '404') ||
-                str_contains($errorMessage, 'expired') ||
-                str_contains($errorMessage, 'not found')) {
-                throw new \Exception('WETRANSFER_EXPIRED:' . $errorMessage);
-            }
-
-            throw new \Exception('Failed to get download link from WeTransfer');
         }
+
+        // Exhausted retries on transient errors.
+        $errorMessage = $lastException?->getMessage() ?? 'unknown error';
+        Log::error('Failed to get direct download link', ['error' => $errorMessage]);
+
+        if (str_contains($errorMessage, 'No download access') ||
+            str_contains($errorMessage, '404') ||
+            str_contains($errorMessage, 'expired') ||
+            str_contains($errorMessage, 'not found') ||
+            str_contains($errorMessage, 'Forbidden')) {
+            throw new \Exception('WETRANSFER_EXPIRED:' . $errorMessage);
+        }
+
+        throw new \Exception('Failed to get download link from WeTransfer');
     }
 
     /**
