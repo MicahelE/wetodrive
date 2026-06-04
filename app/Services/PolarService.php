@@ -78,6 +78,8 @@ class PolarService
             $response = $this->client()->checkouts->create($checkout);
             $checkoutUrl = $response->checkout->url;
 
+            $transaction->update(['redirected_at' => now()]);
+
             Log::info('Polar checkout created', [
                 'user_id' => $user->id,
                 'plan_id' => $plan->id,

@@ -1157,6 +1157,18 @@
                                     </button>
                                 </div>`;
 
+                            if (data.show_upgrade_prompt) {
+                                successHtml += `
+                                    <div style="background: #e7f3ff; border: 1px solid #b8daff; color: #004085; padding: 15px; border-radius: 8px; margin-top: 12px;">
+                                        <div style="font-weight: 600; margin-bottom: 6px;">Need bigger transfers?</div>
+                                        <div style="margin-bottom: 12px;">Upgrade to Pro for 10GB file transfers and more.</div>
+                                        <a href="{{ route('subscription.pricing') }}"
+                                           style="display: inline-block; background: #4285f4; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+                                            Upgrade Plan
+                                        </a>
+                                    </div>`;
+                            }
+
                             document.getElementById('completionMessage').innerHTML = successHtml;
 
                             // Update transfer counts in UI

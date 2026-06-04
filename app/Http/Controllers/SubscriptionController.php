@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\SubscriptionActivatedMail;
 use App\Mail\SubscriptionCancelledMail;
+use App\Models\PaymentTransaction;
 use App\Models\SubscriptionPlan;
 use App\Services\GeoLocationService;
 use App\Services\PaystackService;
@@ -77,6 +78,13 @@ class SubscriptionController extends Controller
             }
 
             if ($result['success']) {
+                Log::info('payment.redirect_issued', [
+                    'user_id' => $user->id,
+                    'plan_id' => $plan->id,
+                    'provider' => $paymentProvider,
+                    'reference' => $result['reference'] ?? null,
+                ]);
+
                 if ($paymentProvider === 'paystack') {
                     return redirect($result['authorization_url']);
                 } else {
@@ -105,6 +113,15 @@ class SubscriptionController extends Controller
         if (!$reference) {
             return redirect()->route('home')->with('error', 'Invalid payment reference.');
         }
+
+        PaymentTransaction::where('provider', 'paystack')
+            ->where('provider_reference', $reference)
+            ->update(['returned_at' => now()]);
+
+        Log::info('payment.user_returned', [
+            'provider' => 'paystack',
+            'reference' => $reference,
+        ]);
 
         try {
             $verification = $this->paystackService->verifyPayment($reference);
@@ -138,6 +155,26 @@ class SubscriptionController extends Controller
         if (!$user) {
             return redirect()->route('home')->with('error', 'Please login to view your subscription.');
         }
+
+        // The Polar return carries ?checkout_id=, not our reference, so stamp the
+        // most-recent pending polar transaction we redirected this user to.
+        $transaction = PaymentTransaction::where('user_id', $user->id)
+            ->where('provider', 'polar')
+            ->where('status', 'pending')
+            ->whereNotNull('redirected_at')
+            ->latest('redirected_at')
+            ->first();
+
+        if ($transaction) {
+            $transaction->update(['returned_at' => now()]);
+        }
+
+        Log::info('payment.user_returned', [
+            'provider' => 'polar',
+            'user_id' => $user->id,
+            'checkout_id' => $request->query('checkout_id'),
+            'transaction_id' => $transaction?->id,
+        ]);
 
         try {
             $this->polarService->syncSubscriptionsFromPolar($user);

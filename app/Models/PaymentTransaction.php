@@ -19,12 +19,16 @@ class PaymentTransaction extends Model
         'payment_method',
         'provider_response',
         'paid_at',
+        'redirected_at',
+        'returned_at',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'provider_response' => 'array',
         'paid_at' => 'datetime',
+        'redirected_at' => 'datetime',
+        'returned_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

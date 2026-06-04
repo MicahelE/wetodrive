@@ -52,6 +52,8 @@ class PaystackService
             ]);
 
             if ($response->status) {
+                $transaction->update(['redirected_at' => now()]);
+
                 Log::info('Paystack payment initialized', [
                     'user_id' => $user->id,
                     'plan_id' => $plan->id,
