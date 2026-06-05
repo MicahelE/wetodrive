@@ -521,7 +521,9 @@ class TransferController extends Controller
                 Cache::put("transfer_result_{$transferId}", [
                     'success' => true,
                     'google_drive_id' => $googleDriveFileId,
-                    'filename' => $fileInfo['filename']
+                    'filename' => $fileInfo['filename'],
+                    // Nudge non-paid users to upgrade at the moment of value.
+                    'show_upgrade_prompt' => !$user->hasActiveSubscription(),
                 ], 300);
 
                 try {

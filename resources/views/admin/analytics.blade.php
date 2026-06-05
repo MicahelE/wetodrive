@@ -59,6 +59,48 @@
     </div>
 </div>
 
+<div class="stat-card" style="margin: 20px 0;">
+    <h3>Payment Funnel (checkout drop-off)</h3>
+    <p style="color: #7f8c8d; font-size: 13px; margin: 4px 0 12px;">
+        Of users we redirected to a payment provider, how many returned to our site and how many actually paid.
+    </p>
+    @if($analytics['payment_funnel']->count() > 0)
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Provider</th>
+                    <th>Redirected</th>
+                    <th>Returned</th>
+                    <th>Paid</th>
+                    <th>Conversion</th>
+                    <th>Abandoned</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($analytics['payment_funnel'] as $row)
+                    @php
+                        $redirected = (int) $row->redirected;
+                        $returned = (int) $row->returned;
+                        $succeeded = (int) $row->succeeded;
+                        $conversion = $redirected > 0 ? round($succeeded / $redirected * 100, 1) : 0;
+                        $abandoned = $redirected > 0 ? round(($redirected - $succeeded) / $redirected * 100, 1) : 0;
+                    @endphp
+                    <tr>
+                        <td>{{ ucfirst($row->provider) }}</td>
+                        <td>{{ $redirected }}</td>
+                        <td>{{ $returned }}</td>
+                        <td>{{ $succeeded }}</td>
+                        <td style="font-weight: bold; color: #27ae60;">{{ $conversion }}%</td>
+                        <td style="font-weight: bold; color: {{ $abandoned >= 50 ? '#e74c3c' : '#7f8c8d' }};">{{ $abandoned }}%</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @else
+        <p>No checkout attempts recorded yet.</p>
+    @endif
+</div>
+
 <div class="stat-card">
     <h3>Quick Stats</h3>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">

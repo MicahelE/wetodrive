@@ -190,6 +190,18 @@ class AdminController extends Controller
             'payment_provider_stats' => PaymentTransaction::selectRaw('provider, status, COUNT(*) as count')
                 ->groupBy('provider', 'status')
                 ->get(),
+
+            // Where checkout sessions drop off: redirected to provider -> returned
+            // to our callback -> actually paid. Only counts attempts we redirected.
+            'payment_funnel' => PaymentTransaction::selectRaw(
+                    'provider,
+                     SUM(CASE WHEN redirected_at IS NOT NULL THEN 1 ELSE 0 END) as redirected,
+                     SUM(CASE WHEN returned_at IS NOT NULL THEN 1 ELSE 0 END) as returned,
+                     SUM(CASE WHEN status = "success" THEN 1 ELSE 0 END) as succeeded'
+                )
+                ->whereNotNull('redirected_at')
+                ->groupBy('provider')
+                ->get(),
         ];
 
         return view('admin.analytics', compact('analytics'));
