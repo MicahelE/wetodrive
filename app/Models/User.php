@@ -123,11 +123,9 @@ class User extends Authenticatable
 
     public function incrementTransferCount(): void
     {
-        // Mark trial as used for free tier users on their first transfer
-        if ($this->hasTrialTransferAvailable()) {
-            $this->markTrialTransferUsed();
-        }
-
+        // Trial consumption is handled atomically at transfer admission
+        // (TransferController::resolveFileSizeLimit), not here, so that a
+        // small transfer never burns the one-time large-file trial.
         $this->increment('total_transfers');
         $this->update(['last_transfer_at' => now()]);
 
@@ -144,6 +142,35 @@ class User extends Authenticatable
     public function markTrialTransferUsed(): void
     {
         $this->update(['has_used_trial_transfer' => true]);
+    }
+
+    /**
+     * Atomically claim the one-time trial transfer. Returns true only if THIS
+     * call won it — a single conditional UPDATE so concurrent transfers can't
+     * both pass the file-size check on the same unused trial.
+     */
+    public function claimTrialTransfer(): bool
+    {
+        $won = static::where('id', $this->id)
+            ->where('subscription_tier', 'free')
+            ->where('has_used_trial_transfer', false)
+            ->update(['has_used_trial_transfer' => true]) === 1;
+
+        if ($won) {
+            $this->has_used_trial_transfer = true; // keep in-memory model in sync
+        }
+
+        return $won;
+    }
+
+    /**
+     * Return the trial to the user (e.g. when a claimed transfer then fails),
+     * so a failed transfer never burns the one-time allowance.
+     */
+    public function releaseTrialTransfer(): void
+    {
+        static::where('id', $this->id)->update(['has_used_trial_transfer' => false]);
+        $this->has_used_trial_transfer = false;
     }
 
     private const COUNTRY_NAMES = [

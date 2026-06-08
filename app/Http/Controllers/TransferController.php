@@ -144,9 +144,14 @@ class TransferController extends Controller
                 'mimeType' => $fileInfo['mimeType']
             ]);
 
-            // Validate file size against subscription limits
-            if (!$this->checkFileSizeLimit($user, $fileInfo['size'])) {
-                $maxSize = $this->getMaxFileSizeForUser($user);
+            // Validate file size against subscription limits, claiming the
+            // one-time trial allowance atomically if this transfer needs it.
+            [$maxSize, $claimedTrial] = $this->resolveFileSizeLimit($user, $fileInfo['size']);
+
+            if ($fileInfo['size'] > $maxSize) {
+                if ($claimedTrial) {
+                    $user->releaseTrialTransfer(); // file still too big — don't burn the trial
+                }
 
                 Log::warning('File size exceeds user plan limit', [
                     'user_id' => $user->id,
@@ -186,7 +191,7 @@ class TransferController extends Controller
                     'size' => $fileInfo['size'],
                     'size_mb' => round($fileInfo['size'] / 1048576, 2)
                 ]);
-                return $this->transferWithDiskAsync($downloadUrl, $user, $request, $fileInfo, $transferId);
+                return $this->transferWithDiskAsync($downloadUrl, $user, $request, $fileInfo, $transferId, $claimedTrial);
             }
 
             // For Ajax requests with files >= 1GB, use streaming approach
@@ -332,6 +337,11 @@ class TransferController extends Controller
                         'trace' => $e->getTraceAsString()
                     ]);
 
+                    // Failed before success — return the trial if this transfer claimed it.
+                    if ($claimedTrial) {
+                        $user->releaseTrialTransfer();
+                    }
+
                     // Mark transfer as failed
                     StreamProgressController::completeTransfer($transferId, false);
                     Cache::put("transfer_result_{$transferId}", [
@@ -437,7 +447,7 @@ class TransferController extends Controller
      * Downloads to temp file, then uploads to Google Drive
      * Used for files < 1GB for better reliability
      */
-    private function transferWithDiskAsync(string $downloadUrl, $user, Request $request, array $fileInfo, string $transferId)
+    private function transferWithDiskAsync(string $downloadUrl, $user, Request $request, array $fileInfo, string $transferId, bool $claimedTrial = false)
     {
         if ($request->ajax()) {
             Log::info('[AJAX] Processing disk-based transfer (async)', [
@@ -563,6 +573,11 @@ class TransferController extends Controller
                     'trace' => $e->getTraceAsString()
                 ]);
 
+                // Failed before success — return the trial if this transfer claimed it.
+                if ($claimedTrial) {
+                    $user->releaseTrialTransfer();
+                }
+
                 // Mark transfer as failed
                 StreamProgressController::completeTransfer($transferId, false);
                 Cache::put("transfer_result_{$transferId}", [
@@ -596,6 +611,8 @@ class TransferController extends Controller
      */
     private function transferWithDisk(string $wetransferUrl, $user)
     {
+        $claimedTrial = false;
+
         try {
             $downloadUrl = $this->parseWeTransferUrl($wetransferUrl);
             Log::info('Parsed download URL', ['download_url' => $downloadUrl]);
@@ -608,14 +625,19 @@ class TransferController extends Controller
                 'temp_file' => $fileInfo['temp_file']
             ]);
 
-            // Validate file size against subscription limits
-            if (!$this->checkFileSizeLimit($user, $fileInfo['size'])) {
+            // Validate file size against subscription limits, claiming the
+            // one-time trial allowance atomically if this transfer needs it.
+            [$maxSize, $claimedTrial] = $this->resolveFileSizeLimit($user, $fileInfo['size']);
+
+            if ($fileInfo['size'] > $maxSize) {
+                if ($claimedTrial) {
+                    $user->releaseTrialTransfer(); // file still too big — don't burn the trial
+                }
+
                 // Cleanup temp file
                 if (file_exists($fileInfo['temp_file'])) {
                     unlink($fileInfo['temp_file']);
                 }
-
-                $maxSize = $this->getMaxFileSizeForUser($user);
 
                 Log::warning('File size exceeds user plan limit', [
                     'user_id' => $user->id,
@@ -676,6 +698,11 @@ class TransferController extends Controller
 
             return redirect()->back()->with('success', $successMessage);
         } catch (\Exception $e) {
+            // Failed before success — return the trial if this transfer claimed it.
+            if ($claimedTrial) {
+                $user->releaseTrialTransfer();
+            }
+
             // Cleanup any temp files that might have been created
             if (isset($fileInfo['temp_file']) && file_exists($fileInfo['temp_file'])) {
                 unlink($fileInfo['temp_file']);
@@ -1184,25 +1211,31 @@ class TransferController extends Controller
         return $user->total_transfers < 5;
     }
 
-    private function checkFileSizeLimit($user, int $fileSize): bool
+    /**
+     * Decide the max file size for this transfer and, when the file actually
+     * needs the one-time trial allowance, atomically claim it. Returns
+     * [int $maxSize, bool $claimedTrial]. Claiming up-front (rather than at
+     * completion) closes the race where several large transfers started before
+     * the first finishes all pass the size check on the same unused trial.
+     * If the caller then rejects the file, it must releaseTrialTransfer().
+     */
+    private function resolveFileSizeLimit($user, int $size): array
     {
-        $maxSize = $this->getMaxFileSizeForUser($user);
-        return $fileSize <= $maxSize;
-    }
+        $freeLimit = 100 * 1024 * 1024; // 100MB
 
-    private function getMaxFileSizeForUser($user): int
-    {
         if ($user->hasActiveSubscription()) {
-            return $user->activeSubscription->subscriptionPlan->max_file_size;
+            return [$user->activeSubscription->subscriptionPlan->max_file_size, false];
         }
 
-        // Trial transfer: free users get one 10GB transfer
-        if ($user->hasTrialTransferAvailable()) {
-            return 10 * 1024 * 1024 * 1024; // 10GB trial limit
+        if ($size <= $freeLimit) {
+            return [$freeLimit, false]; // fits free tier — trial untouched
         }
 
-        // Free tier: 100MB
-        return 100 * 1024 * 1024;
+        if ($user->claimTrialTransfer()) {
+            return [10 * 1024 * 1024 * 1024, true]; // trial claimed atomically (10GB)
+        }
+
+        return [$freeLimit, false]; // trial already used/claimed — capped at free tier
     }
 
     private function formatFileSize(int $bytes): string
