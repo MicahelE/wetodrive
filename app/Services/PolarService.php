@@ -117,6 +117,24 @@ class PolarService
             $eventName = $data['type'] ?? null;
             $eventData = $data['data'] ?? [];
 
+            // This Polar organization hosts products for several apps, and a Polar
+            // webhook endpoint receives EVERY event for the whole org. Ignore any
+            // event whose product isn't WeToDrive's so another app's renewal or
+            // cancellation can never touch a record here.
+            $mutatingEvents = [
+                'subscription.created', 'subscription.active', 'subscription.updated',
+                'subscription.canceled', 'subscription.cancelled', 'subscription.revoked',
+                'order.created', 'order.paid',
+            ];
+
+            if (in_array($eventName, $mutatingEvents, true) && !$this->eventBelongsToWeToDrive($eventData)) {
+                Log::info('Polar webhook ignored: not a WeToDrive product', [
+                    'event' => $eventName,
+                    'polar_id' => $eventData['id'] ?? null,
+                ]);
+                return true;
+            }
+
             switch ($eventName) {
                 case 'subscription.created':
                     return $this->handleSubscriptionCreated($eventData);
@@ -165,36 +183,93 @@ class PolarService
 
     private function handleSubscriptionUpdated(array $data): bool
     {
-        $status = $data['status'] ?? null;
-        $subscription = $this->findSubscription($data);
-
-        if (!$subscription) {
-            $subscription = $this->findOrCreateSubscription($data);
-        }
+        // findOrCreateSubscription updates an existing record (incl. reactivation
+        // and renewal recording) or creates one if we somehow missed the original.
+        $subscription = $this->findOrCreateSubscription($data);
 
         if (!$subscription) {
             Log::warning('Polar subscription.updated: subscription not found and could not be auto-created', [
                 'polar_id' => $data['id'] ?? null,
             ]);
-            return true;
-        }
-
-        if ($status === 'active') {
-            $renewsAt = $data['current_period_end'] ?? null;
-            $previousPeriodEnd = $subscription->expires_at?->toIso8601String();
-
-            $subscription->update([
-                'expires_at' => $renewsAt,
-                'period_resets_at' => $renewsAt,
-                'metadata' => $data,
-            ]);
-
-            if ($previousPeriodEnd && $renewsAt && $renewsAt !== $previousPeriodEnd) {
-                $this->recordRenewal($subscription);
-            }
         }
 
         return true;
+    }
+
+    /**
+     * Reconcile a local subscription with the latest Polar state: extend the
+     * period, map the status, and — crucially — re-link the user if Polar says
+     * the subscription is active. This restores a paying customer who was
+     * downgraded by subscriptions:expire after a renewal we hadn't yet synced.
+     */
+    private function applyPolarState(UserSubscription $subscription, array $data): void
+    {
+        $renewsAt = $data['current_period_end'] ?? null;
+        $previousPeriodEnd = $subscription->expires_at?->toIso8601String();
+        $mappedStatus = isset($data['status'])
+            ? $this->mapPolarStatus($data['status'])
+            : $subscription->status;
+
+        $attrs = [
+            'status' => $mappedStatus,
+            'metadata' => $data,
+        ];
+        if ($renewsAt) {
+            $attrs['expires_at'] = $renewsAt;
+            $attrs['period_resets_at'] = $renewsAt;
+        }
+        $subscription->update($attrs);
+
+        if ($mappedStatus !== 'active') {
+            return;
+        }
+
+        // Make sure the user points at this active subscription and the right tier.
+        $user = $subscription->user;
+        $plan = $subscription->subscriptionPlan;
+        if ($user && $plan && (int) $user->active_subscription_id !== (int) $subscription->id) {
+            $user->update([
+                'subscription_tier' => $plan->slug,
+                'active_subscription_id' => $subscription->id,
+            ]);
+
+            Log::info('Polar subscription reactivated for user', [
+                'subscription_id' => $subscription->id,
+                'user_id' => $user->id,
+            ]);
+        }
+
+        // Record a renewal (resets transfers + a renewal transaction) only when
+        // the billing period actually advanced.
+        if ($previousPeriodEnd && $renewsAt && $renewsAt !== $previousPeriodEnd) {
+            $this->recordRenewal($subscription, $renewsAt);
+        }
+    }
+
+    /**
+     * Decide whether a webhook event is for one of WeToDrive's Polar products.
+     * The org is shared across multiple apps, so events for foreign products
+     * must be ignored.
+     */
+    private function eventBelongsToWeToDrive(array $data): bool
+    {
+        $ourProducts = array_values(array_filter((array) config('polar.product_ids')));
+
+        $productId = $data['product_id']
+            ?? ($data['product']['id'] ?? null)
+            ?? ($data['items'][0]['product_id'] ?? ($data['items'][0]['product']['id'] ?? null));
+
+        if ($productId && in_array($productId, $ourProducts, true)) {
+            return true;
+        }
+
+        // Our own checkouts stamp identifying metadata onto the order/subscription.
+        $metadata = $data['metadata'] ?? [];
+        if (!empty($metadata['transaction_id']) || !empty($metadata['plan_id'])) {
+            return true;
+        }
+
+        return false;
     }
 
     private function handleSubscriptionCancelled(array $data): bool
@@ -278,6 +353,9 @@ class PolarService
     {
         $existing = $this->findSubscription($data);
         if ($existing) {
+            // Reconcile the existing record with the latest Polar state (renewal,
+            // reactivation, cancellation) instead of leaving it stale.
+            $this->applyPolarState($existing, $data);
             return $existing;
         }
 
@@ -391,23 +469,36 @@ class PolarService
         $user->update(['active_subscription_id' => null]);
     }
 
-    private function recordRenewal(UserSubscription $subscription): void
+    private function recordRenewal(UserSubscription $subscription, ?string $periodEnd = null): void
     {
         $subscription->update([
             'transfers_used' => 0,
         ]);
 
-        PaymentTransaction::create([
-            'user_id' => $subscription->user_id,
-            'user_subscription_id' => $subscription->id,
-            'provider' => 'polar',
-            'provider_reference' => 'renewal_' . $subscription->provider_subscription_id . '_' . now()->timestamp,
-            'type' => 'renewal',
-            'status' => 'success',
-            'amount' => $subscription->amount_paid,
-            'currency' => $subscription->currency,
-            'paid_at' => now(),
-        ]);
+        // Key the reference on the new period so a webhook and the reconcile job
+        // can't double-record the same renewal (the column is unique).
+        $reference = 'renewal_' . $subscription->provider_subscription_id . '_' . ($periodEnd ?? (string) now()->timestamp);
+
+        try {
+            PaymentTransaction::create([
+                'user_id' => $subscription->user_id,
+                'user_subscription_id' => $subscription->id,
+                'provider' => 'polar',
+                'provider_reference' => $reference,
+                'type' => 'renewal',
+                'status' => 'success',
+                'amount' => $subscription->amount_paid,
+                'currency' => $subscription->currency,
+                'paid_at' => now(),
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Duplicate reference => this renewal was already recorded. Ignore.
+            Log::info('Polar renewal already recorded; skipping duplicate', [
+                'subscription_id' => $subscription->id,
+                'reference' => $reference,
+            ]);
+            return;
+        }
 
         Log::info('Polar subscription renewed', [
             'subscription_id' => $subscription->id,

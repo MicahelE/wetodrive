@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule): void {
+        // Pull fresh Polar state before expiring, so a renewed-but-unsynced
+        // subscription isn't wrongly expired (renewals arrive only via webhook).
+        $schedule->command('polar:reconcile')->dailyAt('08:55');
         $schedule->command('subscriptions:notify-expiring --days=3')->dailyAt('09:00');
         $schedule->command('subscriptions:expire')->dailyAt('09:05');
         $schedule->command('emails:send-check-ins')->dailyAt('10:00');
