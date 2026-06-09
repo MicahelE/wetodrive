@@ -321,19 +321,21 @@ class SubscriptionController extends Controller
                 return response('Unauthorized', 401);
             }
 
-            $secretBytes = str_starts_with($secret, 'whsec_')
-                ? base64_decode(substr($secret, 6))
-                : $secret;
-
             $signedPayload = $id . '.' . $timestamp . '.' . $body;
-            $expected = base64_encode(hash_hmac('sha256', $signedPayload, $secretBytes, true));
 
+            // Polar follows Standard Webhooks but its secret carries a "polar_"
+            // prefix rather than the spec's "whsec_", and it's unclear whether the
+            // key is used raw or base64-decoded. Accept the signature under any
+            // reasonable derivation so verification doesn't depend on guessing.
             $valid = false;
-            foreach (explode(' ', $signatureHeader) as $pair) {
-                [, $sig] = array_pad(explode(',', $pair, 2), 2, null);
-                if ($sig !== null && hash_equals($expected, $sig)) {
-                    $valid = true;
-                    break;
+            foreach ($this->polarSecretKeyCandidates($secret) as $key) {
+                $expected = base64_encode(hash_hmac('sha256', $signedPayload, $key, true));
+                foreach (explode(' ', $signatureHeader) as $pair) {
+                    [, $sig] = array_pad(explode(',', $pair, 2), 2, null);
+                    if ($sig !== null && hash_equals($expected, $sig)) {
+                        $valid = true;
+                        break 2;
+                    }
                 }
             }
 
@@ -356,5 +358,35 @@ class SubscriptionController extends Controller
 
             return response('Error', 500);
         }
+    }
+
+    /**
+     * Possible HMAC keys for a Polar webhook secret. Polar uses the Standard
+     * Webhooks scheme but with a "polar_" prefix, and may use the key raw or
+     * base64-decoded — so we try each plausible derivation.
+     *
+     * @return list<string>
+     */
+    private function polarSecretKeyCandidates(string $secret): array
+    {
+        $candidates = [$secret]; // raw, as displayed
+
+        foreach (['whsec_', 'polar_'] as $prefix) {
+            if (str_starts_with($secret, $prefix)) {
+                $stripped = substr($secret, strlen($prefix));
+                $candidates[] = $stripped; // raw without prefix
+                $decoded = base64_decode($stripped, true);
+                if ($decoded !== false) {
+                    $candidates[] = $decoded; // base64-decoded (Standard Webhooks)
+                }
+            }
+        }
+
+        $decodedWhole = base64_decode($secret, true);
+        if ($decodedWhole !== false) {
+            $candidates[] = $decodedWhole;
+        }
+
+        return array_values(array_unique($candidates));
     }
 }
