@@ -14,6 +14,7 @@ use GuzzleHttp\Cookie\CookieJar;
 use App\Mail\TransferCompleteMail;
 use App\Mail\TransferFailedMail;
 use App\Services\StreamTransferService;
+use App\Services\ResumableDownloader;
 use App\Http\Controllers\StreamProgressController;
 use App\Models\Transfer;
 use Illuminate\Support\Facades\Mail;
@@ -191,7 +192,11 @@ class TransferController extends Controller
                     'size' => $fileInfo['size'],
                     'size_mb' => round($fileInfo['size'] / 1048576, 2)
                 ]);
-                return $this->transferWithDiskAsync($downloadUrl, $user, $request, $fileInfo, $transferId, $claimedTrial);
+                return $this->transferWithDiskAsync(
+                    $downloadUrl, $user, $request, $fileInfo, $transferId, $claimedTrial,
+                    // Re-mint a fresh direct link (new 10-min token) on resume.
+                    fn () => $streamService->parseWeTransferUrl($wetransferUrl)
+                );
             }
 
             // For Ajax requests with files >= 1GB, use streaming approach
@@ -447,7 +452,7 @@ class TransferController extends Controller
      * Downloads to temp file, then uploads to Google Drive
      * Used for files < 1GB for better reliability
      */
-    private function transferWithDiskAsync(string $downloadUrl, $user, Request $request, array $fileInfo, string $transferId, bool $claimedTrial = false)
+    private function transferWithDiskAsync(string $downloadUrl, $user, Request $request, array $fileInfo, string $transferId, bool $claimedTrial = false, ?callable $refreshUrl = null)
     {
         if ($request->ajax()) {
             Log::info('[AJAX] Processing disk-based transfer (async)', [
@@ -496,7 +501,7 @@ class TransferController extends Controller
                     $percentage = $total > 0 ? ($downloaded / $total) * 50 : 0;
                     $bytesProgress = (int)($totalSize * $percentage / 100);
                     StreamProgressController::updateProgress($transferId, $bytesProgress, $totalSize, $fileInfo['filename'], 'downloading');
-                });
+                }, $refreshUrl);
 
                 Log::info('[AJAX] Download complete, starting upload phase', [
                     'transfer_id' => $transferId,
@@ -617,7 +622,12 @@ class TransferController extends Controller
             $downloadUrl = $this->parseWeTransferUrl($wetransferUrl);
             Log::info('Parsed download URL', ['download_url' => $downloadUrl]);
 
-            $fileInfo = $this->downloadFile($downloadUrl);
+            $fileInfo = $this->downloadFile(
+                $downloadUrl,
+                null,
+                // Re-mint a fresh direct link (new 10-min token) on resume.
+                fn () => $this->parseWeTransferUrl($wetransferUrl)
+            );
             Log::info('File downloaded to disk', [
                 'filename' => $fileInfo['filename'],
                 'size' => $fileInfo['size'],
@@ -925,7 +935,7 @@ class TransferController extends Controller
         }
     }
     
-    private function downloadFile($url, $progressCallback = null)
+    private function downloadFile($url, $progressCallback = null, ?callable $refreshUrl = null)
     {
         Log::info('Starting file download', ['url' => $url]);
 
@@ -991,21 +1001,28 @@ class TransferController extends Controller
 
             Log::info('Extracted filename', ['filename' => $filename]);
 
-            // Now stream the actual file download
-            $resource = fopen($tempFile, 'w');
-            if (!$resource) {
-                throw new \Exception('Could not create temporary file for download');
-            }
+            // Now stream the actual file download. WeTransfer's signed URLs
+            // expire ~10 minutes after minting, so a slow/large download gets
+            // its connection cut mid-stream (cURL error 18). Resume from the
+            // last byte via Range requests, re-minting the URL between tries.
+            $acceptRanges = stripos($headResponse->getHeaderLine('accept-ranges'), 'bytes') !== false;
+            $expectedSize = ($contentLength !== 'unknown') ? (int) $contentLength : null;
 
-            Log::info('Starting streaming download', ['expected_size' => $contentLength]);
-
-            $response = $client->get($url, [
-                'sink' => $resource
+            Log::info('Starting streaming download', [
+                'expected_size' => $contentLength,
+                'resumable' => $acceptRanges,
             ]);
 
-            fclose($resource);
+            $downloader = new ResumableDownloader();
+            $actualSize = $downloader->download(
+                $tempFile,
+                $url,
+                $expectedSize,
+                $refreshUrl,
+                $progressCallback,
+                $acceptRanges
+            );
 
-            $actualSize = filesize($tempFile);
             Log::info('File streamed to disk', ['size_bytes' => $actualSize, 'temp_file' => $tempFile]);
 
             // Validate download completed successfully
