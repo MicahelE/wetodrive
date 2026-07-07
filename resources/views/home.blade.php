@@ -732,7 +732,7 @@
 
                     @if(Auth::user()->hasTrialTransferAvailable())
                         <div style="background: linear-gradient(135deg, #e8f5e9, #c8e6c9); border: 1px solid #a5d6a7; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; color: #2e7d32; font-weight: 500; text-align: center;">
-                            Your first transfer supports files up to 10GB!
+                            Your first transfer supports files up to 3GB!
                         </div>
                     @endif
 

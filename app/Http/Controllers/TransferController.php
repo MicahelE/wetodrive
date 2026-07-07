@@ -1249,7 +1249,7 @@ class TransferController extends Controller
         }
 
         if ($user->claimTrialTransfer()) {
-            return [10 * 1024 * 1024 * 1024, true]; // trial claimed atomically (10GB)
+            return [3 * 1024 * 1024 * 1024, true]; // trial claimed atomically (3GB)
         }
 
         return [$freeLimit, false]; // trial already used/claimed — capped at free tier

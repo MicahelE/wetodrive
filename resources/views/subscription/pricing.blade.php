@@ -556,7 +556,7 @@
 
 
         <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 12px; padding: 16px 24px; text-align: center; margin-bottom: 30px; color: white; font-size: 1.1rem;">
-            Try your first transfer free — up to 10GB, no credit card needed
+            Try your first transfer free — up to 3GB, no credit card needed
         </div>
 
         <div class="pricing-grid">
@@ -587,7 +587,7 @@
                             <li>{{ $feature }}</li>
                         @endforeach
                         @if($plan->slug === 'free')
-                            <li><strong>First transfer supports files up to 10GB</strong></li>
+                            <li><strong>First transfer supports files up to 3GB</strong></li>
                         @endif
                     </ul>
 
