@@ -8,8 +8,14 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\StreamProgressController;
+use App\Http\Controllers\UnsubscribeController;
 
 Route::get('/', [TransferController::class, 'index'])->name('home');
+
+// Marketing unsubscribe. Signed URL, no auth — the link lives in the email itself.
+Route::get('/unsubscribe/{user}', [UnsubscribeController::class, 'unsubscribe'])
+    ->name('unsubscribe')
+    ->middleware('signed');
 Route::post('/transfer', [TransferController::class, 'transfer'])->name('transfer');
 
 // Progress tracking for streaming transfers

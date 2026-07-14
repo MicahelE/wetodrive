@@ -1,10 +1,10 @@
 <x-mail::message>
-# Your file fits now
+# We've raised the file size limits
 
 Hi {{ $user->name }},
 
 @if ($apologise)
-I'm sorry. You subscribed to Pro and then found your file was still too large to transfer — that's a poor experience and it was our fault, not yours.
+I'm sorry. You subscribed to Pro and then found your file was still too large to transfer. That's a poor experience and it was our fault, not yours.
 
 We've raised the limits. **Pro now handles files up to 25GB** (it was 10GB), and Premium goes up to 500GB.
 
@@ -12,7 +12,11 @@ Your Pro subscription is active and paid through {{ $user->activeSubscription?->
 @else
 We've raised our file size limits. **Pro now handles files up to 25GB** (it was 10GB), and Premium goes up to 500GB.
 
-You tried a transfer recently that was over the limit — it will go through now.
+@if ($filename)
+The transfer you tried was over the old limit. It will go through now.
+@else
+If our limits were what stopped you before, they probably aren't any more.
+@endif
 @endif
 
 @if ($filename)
@@ -22,7 +26,7 @@ You tried a transfer recently that was over the limit — it will go through now
 @endif
 @endif
 
-Just paste your WeTransfer link again and it will transfer straight to your Google Drive.
+Paste your WeTransfer link and it will transfer straight to your Google Drive.
 
 <x-mail::button :url="route('home')">
 Start your transfer

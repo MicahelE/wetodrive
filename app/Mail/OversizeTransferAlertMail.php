@@ -26,7 +26,7 @@ class OversizeTransferAlertMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Transfer above every plan — ' . $this->fileSize);
+        return new Envelope(subject: 'Transfer above every plan: ' . $this->fileSize);
     }
 
     public function content(): Content

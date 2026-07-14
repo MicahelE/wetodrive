@@ -32,6 +32,8 @@ class User extends Authenticatable
         'last_transfer_at',
         'has_used_trial_transfer',
         'check_in_email_sent',
+        'email_opt_out',
+        'winback_email_sent',
     ];
 
     /**
@@ -59,6 +61,8 @@ class User extends Authenticatable
             'last_transfer_at' => 'datetime',
             'has_used_trial_transfer' => 'boolean',
             'check_in_email_sent' => 'boolean',
+            'email_opt_out' => 'boolean',
+            'winback_email_sent' => 'boolean',
         ];
     }
 

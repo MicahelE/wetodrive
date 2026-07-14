@@ -27,7 +27,7 @@ class LimitsIncreasedMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(subject: $this->apologise
-            ? 'Sorry — and good news: your transfer will go through now'
+            ? 'Sorry, and good news: your transfer will go through now'
             : 'Good news: Pro now handles files up to 25GB');
     }
 
