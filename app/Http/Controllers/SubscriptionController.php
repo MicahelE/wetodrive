@@ -214,17 +214,14 @@ class SubscriptionController extends Controller
         try {
             $subscription = $user->activeSubscription;
 
-            if ($subscription->payment_provider === 'paystack') {
-                // For Paystack, we just cancel locally since it's one-time payment
-                $subscription->cancel();
-                $user->update(['active_subscription_id' => null, 'subscription_tier' => 'free']);
-                $success = true;
-            } elseif ($subscription->payment_provider === 'polar') {
+            // Cancelling only stops the renewal. The user keeps the tier they paid
+            // for until expires_at, at which point subscriptions:expire retires the
+            // row and downgrades them — so no immediate downgrade here.
+            if ($subscription->payment_provider === 'polar') {
                 $success = $this->polarService->cancelSubscription($subscription);
             } else {
-                // Legacy LemonSqueezy rows: cancel locally only (LS integration removed)
+                // Paystack (one-time charge) and legacy LemonSqueezy rows: local only.
                 $subscription->cancel();
-                $user->update(['active_subscription_id' => null, 'subscription_tier' => 'free']);
                 $success = true;
             }
 
@@ -239,7 +236,11 @@ class SubscriptionController extends Controller
                     Log::warning('Failed to send subscription cancelled email', ['error' => $mailEx->getMessage()]);
                 }
 
-                return redirect()->back()->with('success', 'Subscription cancelled successfully.');
+                $accessUntil = $subscription->expires_at?->format('M j, Y');
+
+                return redirect()->back()->with('success', $accessUntil
+                    ? "Subscription cancelled. You keep {$subscription->subscriptionPlan->name} access until {$accessUntil}."
+                    : 'Subscription cancelled successfully.');
             } else {
                 return redirect()->back()->with('error', 'Failed to cancel subscription. Please contact support.');
             }

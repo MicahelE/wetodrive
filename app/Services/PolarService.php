@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Polar\Models\Components\CheckoutCreate;
 use Polar\Models\Components\CustomerSessionCustomerExternalIDCreate;
+use Polar\Models\Components\SubscriptionCancel;
 use Polar\Models\Errors\APIException;
 use Polar\Models\Operations\SubscriptionsListRequest;
 use Polar\Polar;
@@ -514,25 +515,33 @@ class PolarService
         }
 
         try {
-            $this->client()->subscriptions->revoke($subscription->provider_subscription_id);
+            // Cancel at period end — NOT revoke. revoke() terminates immediately and
+            // destroys the period the customer has already paid for. The local row
+            // keeps status 'cancelled' with its expires_at intact, and isActive()
+            // honours that until the period actually ends.
+            $this->client()->subscriptions->update(
+                new SubscriptionCancel(cancelAtPeriodEnd: true),
+                $subscription->provider_subscription_id,
+            );
 
             $subscription->cancel();
 
-            Log::info('Polar subscription revoked via API', [
+            Log::info('Polar subscription set to cancel at period end', [
                 'subscription_id' => $subscription->id,
                 'polar_id' => $subscription->provider_subscription_id,
+                'access_until' => $subscription->expires_at?->toIso8601String(),
             ]);
 
             return true;
         } catch (APIException $e) {
-            Log::error('Failed to revoke Polar subscription', [
+            Log::error('Failed to cancel Polar subscription', [
                 'subscription_id' => $subscription->id,
                 'status' => $e->statusCode,
                 'body' => $e->body,
             ]);
             return false;
         } catch (\Throwable $e) {
-            Log::error('Failed to revoke Polar subscription', [
+            Log::error('Failed to cancel Polar subscription', [
                 'subscription_id' => $subscription->id,
                 'error' => $e->getMessage(),
             ]);

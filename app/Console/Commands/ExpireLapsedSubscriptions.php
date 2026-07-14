@@ -14,8 +14,12 @@ class ExpireLapsedSubscriptions extends Command
 
     public function handle(): int
     {
+        // 'cancelled' is included deliberately: a cancelled subscription keeps
+        // access until its paid period ends (see UserSubscription::isActive), so
+        // this job is the only thing that retires it. Omit it and those users
+        // would keep their tier forever.
         $lapsed = UserSubscription::with('user')
-            ->where('status', 'active')
+            ->whereIn('status', ['active', 'cancelled'])
             ->whereNotNull('expires_at')
             ->where('expires_at', '<', now())
             ->get();

@@ -491,7 +491,7 @@
                     <tr>
                         <td><strong>Large Files (>1GB)</strong></td>
                         <td>Often fails or times out</td>
-                        <td>Handles up to 5GB seamlessly</td>
+                        <td>Handles up to 500GB seamlessly</td>
                     </tr>
                     <tr>
                         <td><strong>Automation</strong></td>
@@ -599,7 +599,7 @@
                     <span>+</span>
                 </div>
                 <div class="faq-answer">
-                    <p>File size limits depend on your plan: Free users can transfer files up to 100MB, Pro users up to 2GB, and Premium users up to 5GB per file. There are also monthly transfer limits: 5 for Free, 100 for Pro, and unlimited for Premium users.</p>
+                    <p>File size limits depend on your plan: Free users can transfer files up to 100MB, Pro users up to 25GB, and Premium users up to 500GB per file. There are also monthly transfer limits: 5 for Free, 100 for Pro, and unlimited for Premium users.</p>
                 </div>
             </div>
 

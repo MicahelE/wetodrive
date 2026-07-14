@@ -11,12 +11,15 @@ use Google_Service_Drive;
 use Google_Service_Drive_DriveFile;
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
+use App\Mail\OversizeTransferAlertMail;
 use App\Mail\TransferCompleteMail;
 use App\Mail\TransferFailedMail;
 use App\Services\StreamTransferService;
 use App\Services\ResumableDownloader;
 use App\Http\Controllers\StreamProgressController;
+use App\Models\SubscriptionPlan;
 use App\Models\Transfer;
+use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 
 class TransferController extends Controller
@@ -166,6 +169,8 @@ class TransferController extends Controller
                     'exceeded_by' => $fileInfo['size'] - $maxSize,
                     'exceeded_by_formatted' => $this->formatFileSize($fileInfo['size'] - $maxSize)
                 ]);
+
+                $this->alertAdminsIfUnservable($user, $fileInfo);
 
                 // For Ajax request, return JSON error with upgrade info
                 if ($request->ajax()) {
@@ -661,6 +666,8 @@ class TransferController extends Controller
                     'exceeded_by' => $fileInfo['size'] - $maxSize,
                     'exceeded_by_formatted' => $this->formatFileSize($fileInfo['size'] - $maxSize)
                 ]);
+
+                $this->alertAdminsIfUnservable($user, $fileInfo);
 
                 return redirect()->back()->with('error',
                     'File size (' . $this->formatFileSize($fileInfo['size']) . ') exceeds your plan limit of ' . $this->formatFileSize($maxSize) . '. ' .
@@ -1253,6 +1260,46 @@ class TransferController extends Controller
         }
 
         return [$freeLimit, false]; // trial already used/claimed — capped at free tier
+    }
+
+    /**
+     * Alert the admins when a file is too big for EVERY plan — there's no upgrade
+     * to sell, so it's a demand signal rather than a conversion opportunity.
+     * Throttled to one alert per user per day; a blocked user typically retries
+     * the same file several times in a row.
+     */
+    private function alertAdminsIfUnservable($user, array $fileInfo): void
+    {
+        try {
+            $topLimit = (int) SubscriptionPlan::max('max_file_size');
+
+            if ($topLimit <= 0 || $fileInfo['size'] <= $topLimit) {
+                return; // an upgrade would cover this — normal upsell path
+            }
+
+            if (! Cache::add("oversize-alert:{$user->id}", true, now()->addDay())) {
+                return; // already alerted for this user today
+            }
+
+            $admins = User::where('role', 'admin')->get();
+            if ($admins->isEmpty()) {
+                return;
+            }
+
+            Mail::to($admins)->send(new OversizeTransferAlertMail(
+                $user,
+                $fileInfo['filename'],
+                $this->formatFileSize($fileInfo['size']),
+                $this->formatFileSize($topLimit),
+                $this->formatFileSize($fileInfo['size'] - $topLimit),
+            ));
+        } catch (\Throwable $e) {
+            // An alert must never break the user's request.
+            Log::warning('Failed to send oversize transfer alert', [
+                'user_id' => $user->id ?? null,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function formatFileSize(int $bytes): string

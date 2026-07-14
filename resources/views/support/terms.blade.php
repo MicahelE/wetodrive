@@ -332,8 +332,8 @@
                 <p>We offer the following subscription tiers:</p>
                 <ol>
                     <li><strong>Free Plan:</strong> 5 transfers/month, 100MB file size limit</li>
-                    <li><strong>Pro Plan:</strong> 100 transfers/month, 2GB file size limit</li>
-                    <li><strong>Premium Plan:</strong> Unlimited transfers, 5GB file size limit</li>
+                    <li><strong>Pro Plan:</strong> 100 transfers/month, 25GB file size limit</li>
+                    <li><strong>Premium Plan:</strong> Unlimited transfers, 500GB file size limit</li>
                 </ol>
 
                 <h3>Billing and Payments</h3>

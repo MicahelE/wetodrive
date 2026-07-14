@@ -440,8 +440,8 @@
                             <p>File size limits depend on your subscription plan:</p>
                             <ul>
                                 <li><strong>Free:</strong> 100MB per file</li>
-                                <li><strong>Pro:</strong> 2GB per file</li>
-                                <li><strong>Premium:</strong> 5GB per file</li>
+                                <li><strong>Pro:</strong> 25GB per file</li>
+                                <li><strong>Premium:</strong> 500GB per file</li>
                             </ul>
                             <p>To transfer larger files, consider upgrading your plan.</p>
                         </div>

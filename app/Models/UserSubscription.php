@@ -49,9 +49,16 @@ class UserSubscription extends Model
         return $this->hasMany(PaymentTransaction::class);
     }
 
+    /**
+     * Whether the subscription grants access right now.
+     *
+     * A cancelled subscription still counts until it expires: cancelling means
+     * "don't renew me", not "refund the month I already paid for". Access ends
+     * at expires_at, when subscriptions:expire retires it.
+     */
     public function isActive(): bool
     {
-        return $this->status === 'active' &&
+        return in_array($this->status, ['active', 'cancelled'], true) &&
                ($this->expires_at === null || $this->expires_at->isFuture());
     }
 

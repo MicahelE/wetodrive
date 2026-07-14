@@ -38,10 +38,10 @@ class SubscriptionPlanSeeder extends Seeder
                 'price_ngn' => 5000,
                 'price_usd' => 10,
                 'transfer_limit' => 100,
-                'max_file_size' => 10 * 1024 * 1024 * 1024, // 10GB
+                'max_file_size' => 25 * 1024 * 1024 * 1024, // 25GB
                 'features' => json_encode([
                     '100 transfers per month',
-                    '10GB file size limit',
+                    '25GB file size limit',
                     'Faster transfer speeds',
                     'Email support',
                     'Transfer history for 30 days'
@@ -57,10 +57,10 @@ class SubscriptionPlanSeeder extends Seeder
                 'price_ngn' => 50000,
                 'price_usd' => 80,
                 'transfer_limit' => null, // unlimited
-                'max_file_size' => 100 * 1024 * 1024 * 1024, // 100GB
+                'max_file_size' => 500 * 1024 * 1024 * 1024, // 500GB
                 'features' => json_encode([
                     'Unlimited transfers',
-                    '100GB file size limit',
+                    '500GB file size limit',
                     'Priority transfer queue',
                     'Bulk transfer support',
                     'API access',
