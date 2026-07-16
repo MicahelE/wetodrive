@@ -612,6 +612,8 @@
                                     <button type="submit" class="plan-button">
                                         @if(Auth::user()->subscription_tier === 'free')
                                             Get Started
+                                        @elseif(optional(Auth::user()->activeSubscription?->subscriptionPlan)->sort_order > $plan->sort_order)
+                                            Switch to {{ $plan->name }}
                                         @else
                                             Upgrade
                                         @endif

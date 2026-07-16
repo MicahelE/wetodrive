@@ -70,6 +70,16 @@ class SubscriptionController extends Controller
             return redirect()->back()->with('error', 'You are already on the free plan.');
         }
 
+        // An existing Polar subscriber can never complete a fresh checkout — Polar
+        // refuses a second live subscription, so the checkout dies on their hosted
+        // page with "you already have a plan". Switch the product instead.
+        $current = $user->activeSubscription;
+        if ($current && $current->payment_provider === 'polar'
+            && $current->provider_subscription_id && $current->isActive()
+            && (int) $current->subscription_plan_id !== (int) $plan->id) {
+            return redirect()->route('subscription.confirm-change', ['plan' => $plan->id]);
+        }
+
         // Determine payment provider based on user's location
         $paymentProvider = $user->getPreferredPaymentProvider();
 
@@ -191,6 +201,59 @@ class SubscriptionController extends Controller
         }
 
         return redirect()->route('home')->with('success', 'Subscription activated successfully! You can now enjoy your new plan.');
+    }
+
+    /**
+     * The live Polar subscription a plan change would act on, or null.
+     */
+    private function switchableSubscription($user, SubscriptionPlan $plan)
+    {
+        $current = $user?->activeSubscription;
+
+        return $current && $current->payment_provider === 'polar'
+            && $current->provider_subscription_id && $current->isActive()
+            && (int) $current->subscription_plan_id !== (int) $plan->id
+                ? $current
+                : null;
+    }
+
+    public function confirmChange(Request $request, SubscriptionPlan $plan)
+    {
+        $user = Auth::user();
+        $current = $this->switchableSubscription($user, $plan);
+
+        if (!$current) {
+            return redirect()->route('subscription.pricing');
+        }
+
+        return view('subscription.confirm-change', [
+            'currentPlan' => $current->subscriptionPlan,
+            'newPlan' => $plan,
+            'subscription' => $current,
+            'estimate' => $this->polarService->estimateProrationCharge($current, $plan),
+            'isUpgrade' => (float) $plan->price_usd > (float) $current->subscriptionPlan->price_usd,
+        ]);
+    }
+
+    public function applyChange(Request $request)
+    {
+        $request->validate(['plan_id' => 'required|exists:subscription_plans,id']);
+
+        $user = Auth::user();
+        $plan = SubscriptionPlan::findOrFail($request->plan_id);
+        $current = $this->switchableSubscription($user, $plan);
+
+        if (!$current) {
+            return redirect()->route('subscription.pricing')->with('error', 'No subscription to change.');
+        }
+
+        if (!$this->polarService->changePlan($current, $plan)) {
+            return redirect()->route('subscription.manage')
+                ->with('error', 'We could not change your plan. Please contact support and we will sort it out.');
+        }
+
+        return redirect()->route('subscription.manage')
+            ->with('success', "You're now on the {$plan->name} plan.");
     }
 
     public function manage(Request $request)

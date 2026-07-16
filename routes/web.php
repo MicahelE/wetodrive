@@ -55,6 +55,8 @@ Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])->name('s
 Route::get('/subscription/manage', [SubscriptionController::class, 'manage'])->name('subscription.manage')->middleware('auth');
 Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel'])->name('subscription.cancel')->middleware('auth');
 Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade'])->name('subscription.upgrade')->middleware('auth');
+Route::get('/subscription/change/{plan}', [SubscriptionController::class, 'confirmChange'])->name('subscription.confirm-change')->middleware('auth');
+Route::post('/subscription/change', [SubscriptionController::class, 'applyChange'])->name('subscription.apply-change')->middleware('auth');
 
 // Payment provider callbacks
 Route::get('/paystack/callback', [SubscriptionController::class, 'paystackCallback'])->name('paystack.callback');

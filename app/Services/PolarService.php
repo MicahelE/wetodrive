@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Mail;
 use Polar\Models\Components\CheckoutCreate;
 use Polar\Models\Components\CustomerSessionCustomerExternalIDCreate;
 use Polar\Models\Components\SubscriptionCancel;
+use Polar\Models\Components\SubscriptionProrationBehavior;
+use Polar\Models\Components\SubscriptionUpdateProduct;
 use Polar\Models\Errors\APIException;
 use Polar\Models\Operations\SubscriptionsListRequest;
 use Polar\Polar;
@@ -222,6 +224,19 @@ class PolarService
         }
         $subscription->update($attrs);
 
+        // A plan change arrives as a product change on the same subscription. Follow
+        // it, or the user gets stamped back to the plan they just upgraded away from.
+        $incoming = $this->resolvePlanFromProduct($data['product_id'] ?? null);
+        if ($incoming && (int) $incoming->id !== (int) $subscription->subscription_plan_id) {
+            $subscription->update(['subscription_plan_id' => $incoming->id]);
+            $subscription->setRelation('subscriptionPlan', $incoming);
+
+            Log::info('Polar subscription plan changed', [
+                'subscription_id' => $subscription->id,
+                'plan' => $incoming->slug,
+            ]);
+        }
+
         if ($mappedStatus !== 'active') {
             return;
         }
@@ -229,7 +244,8 @@ class PolarService
         // Make sure the user points at this active subscription and the right tier.
         $user = $subscription->user;
         $plan = $subscription->subscriptionPlan;
-        if ($user && $plan && (int) $user->active_subscription_id !== (int) $subscription->id) {
+        if ($user && $plan && ((int) $user->active_subscription_id !== (int) $subscription->id
+            || $user->subscription_tier !== $plan->slug)) {
             $user->update([
                 'subscription_tier' => $plan->slug,
                 'active_subscription_id' => $subscription->id,
@@ -556,6 +572,126 @@ class PolarService
             ]);
             return false;
         }
+    }
+
+    /**
+     * Move an existing Polar subscription onto another plan's product.
+     *
+     * Polar refuses to confirm a second checkout while a customer already has a
+     * live subscription, so an existing subscriber can NEVER buy their way onto a
+     * different plan — the checkout is created, then dies on Polar's hosted page
+     * with "you already have a plan". Changing the product on the subscription
+     * they already have is the only route Polar allows.
+     */
+    public function changePlan(UserSubscription $subscription, SubscriptionPlan $newPlan): bool
+    {
+        if ($subscription->payment_provider !== 'polar' || !$subscription->provider_subscription_id) {
+            return false;
+        }
+
+        $productId = $this->getProductIdForPlan($newPlan);
+        if (!$productId) {
+            Log::error('Polar plan change: no product configured for plan', ['plan' => $newPlan->slug]);
+            return false;
+        }
+
+        try {
+            // Uncancel first. A subscription set to cancel at period end is still
+            // "active" to Polar, but upgrading someone onto a plan that still shuts
+            // off at the old period end is not an upgrade.
+            if ($subscription->metadata['cancel_at_period_end'] ?? false) {
+                $this->client()->subscriptions->update(
+                    new SubscriptionCancel(cancelAtPeriodEnd: false),
+                    $subscription->provider_subscription_id,
+                );
+            }
+
+            // Upgrades bill the difference now; downgrades wait for the next period
+            // so we never owe a refund.
+            $currentPrice = (float) ($subscription->subscriptionPlan->price_usd ?? 0);
+            $behavior = (float) $newPlan->price_usd > $currentPrice
+                ? SubscriptionProrationBehavior::Invoice
+                : SubscriptionProrationBehavior::NextPeriod;
+
+            $response = $this->client()->subscriptions->update(
+                new SubscriptionUpdateProduct($productId, $behavior),
+                $subscription->provider_subscription_id,
+            );
+
+            Log::info('Polar subscription plan change requested', [
+                'subscription_id' => $subscription->id,
+                'user_id' => $subscription->user_id,
+                'from' => $subscription->subscriptionPlan->slug ?? null,
+                'to' => $newPlan->slug,
+                'proration' => $behavior->value,
+            ]);
+
+            if ($response->subscription) {
+                $this->applyPolarState($subscription, $this->subscriptionToArray($response->subscription));
+            }
+
+            return true;
+        } catch (APIException $e) {
+            Log::error('Failed to change Polar subscription plan', [
+                'subscription_id' => $subscription->id,
+                'status' => $e->statusCode,
+                'body' => $e->body,
+            ]);
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Failed to change Polar subscription plan', [
+                'subscription_id' => $subscription->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Normalise an SDK Subscription into the snake_case shape the webhook path
+     * (and therefore applyPolarState) already speaks.
+     */
+    private function subscriptionToArray(\Polar\Models\Components\Subscription $sub): array
+    {
+        return [
+            'id' => $sub->id,
+            'status' => $sub->status->value,
+            'product_id' => $sub->productId,
+            'current_period_start' => $sub->currentPeriodStart->format('c'),
+            'current_period_end' => $sub->currentPeriodEnd->format('c'),
+            'cancel_at_period_end' => $sub->cancelAtPeriodEnd,
+            'metadata' => $sub->metadata,
+        ];
+    }
+
+    /**
+     * What we'll charge today to move onto a pricier plan: the price difference,
+     * scaled by how much of the paid period is left.
+     *
+     * ponytail: our own estimate — Polar exposes no proration preview endpoint.
+     * Copy must say "about", never a false-precision figure.
+     */
+    public function estimateProrationCharge(UserSubscription $subscription, SubscriptionPlan $newPlan): float
+    {
+        $difference = (float) $newPlan->price_usd - (float) ($subscription->subscriptionPlan->price_usd ?? 0);
+        if ($difference <= 0 || !$subscription->expires_at) {
+            return 0.0;
+        }
+
+        $periodEnd = $subscription->expires_at;
+        $periodStart = isset($subscription->metadata['current_period_start'])
+            ? Carbon::parse($subscription->metadata['current_period_start'])
+            : $periodEnd->copy()->subMonth();
+
+        $total = $periodStart->diffInSeconds($periodEnd);
+        if ($total <= 0) {
+            return 0.0;
+        }
+
+        $remaining = max(0, now()->diffInSeconds($periodEnd, false));
+        $fraction = min(1.0, $remaining / $total);
+
+        return round($difference * $fraction, 2);
     }
 
     public function getCustomerPortalUrl(User $user): ?string
