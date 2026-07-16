@@ -46,7 +46,10 @@ class SubscriptionController extends Controller
             $user->update(['country_code' => $userCountry]);
         }
 
-        return view('subscription.pricing', compact('plans', 'userCountry', 'paymentProvider'));
+        // A size-aware upsell may deep-link here with the plan the user's file needs.
+        $recommended = $request->query('recommended');
+
+        return view('subscription.pricing', compact('plans', 'userCountry', 'paymentProvider', 'recommended'));
     }
 
     public function subscribe(Request $request)

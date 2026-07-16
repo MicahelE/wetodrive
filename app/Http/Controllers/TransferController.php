@@ -172,19 +172,19 @@ class TransferController extends Controller
 
                 $this->alertAdminsIfUnservable($user, $fileInfo);
 
-                // For Ajax request, return JSON error with upgrade info
+                $payload = $this->limitErrorPayload($user, $fileInfo, $maxSize);
+
+                // For Ajax request, return JSON error with the recommended plan.
                 if ($request->ajax()) {
-                    return response()->json([
-                        'success' => false,
-                        'error' => 'File size (' . $this->formatFileSize($fileInfo['size']) . ') exceeds your plan limit of ' . $this->formatFileSize($maxSize) . '.',
-                        'is_limit_error' => true,
-                        'upgrade_url' => route('subscription.pricing')
-                    ], 400);
+                    return response()->json(array_merge(
+                        ['success' => false, 'error' => $payload['message']],
+                        $payload,
+                    ), 400);
                 }
 
                 return redirect()->back()->with('error',
-                    'File size (' . $this->formatFileSize($fileInfo['size']) . ') exceeds your plan limit of ' . $this->formatFileSize($maxSize) . '. ' .
-                    '<a href="' . route('subscription.pricing') . '" style="color: #4285f4; text-decoration: underline;">Upgrade your plan</a> for larger files.'
+                    e($payload['message']) . ' ' .
+                    '<a href="' . $payload['upgrade_url'] . '" style="color: #4285f4; text-decoration: underline;">See plans</a>.'
                 );
             }
 
@@ -669,9 +669,11 @@ class TransferController extends Controller
 
                 $this->alertAdminsIfUnservable($user, $fileInfo);
 
+                $payload = $this->limitErrorPayload($user, $fileInfo, $maxSize);
+
                 return redirect()->back()->with('error',
-                    'File size (' . $this->formatFileSize($fileInfo['size']) . ') exceeds your plan limit of ' . $this->formatFileSize($maxSize) . '. ' .
-                    '<a href="' . route('subscription.pricing') . '" style="color: #4285f4; text-decoration: underline;">Upgrade your plan</a> for larger files.'
+                    e($payload['message']) . ' ' .
+                    '<a href="' . $payload['upgrade_url'] . '" style="color: #4285f4; text-decoration: underline;">See plans</a>.'
                 );
             }
 
@@ -1300,6 +1302,54 @@ class TransferController extends Controller
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * The cheapest active plan whose file-size cap covers $size, or null when the
+     * file is bigger than every plan (the unservable case). Plans are ordered by
+     * sort_order, which tracks the price ladder.
+     */
+    private function recommendPlanFor(int $size): ?SubscriptionPlan
+    {
+        return SubscriptionPlan::active()
+            ->where('max_file_size', '>=', $size)
+            ->orderBy('sort_order')
+            ->first();
+    }
+
+    /**
+     * Build the "file too large" payload, naming the exact plan the file needs so
+     * the user doesn't buy the wrong tier (the mistake that cost us #382 and Alicia).
+     * Shared by the ajax JSON and the redirect message so the two never diverge.
+     *
+     * @return array{message: string, is_limit_error: bool, upgrade_url: string, recommended_plan?: string, recommended_plan_name?: string, recommended_plan_price?: string, file_size?: string, current_limit?: string}
+     */
+    private function limitErrorPayload($user, array $fileInfo, int $maxSize): array
+    {
+        $fileSize = $this->formatFileSize($fileInfo['size']);
+        $plan = $this->recommendPlanFor($fileInfo['size']);
+
+        if (! $plan) {
+            // Bigger than every plan — nothing to sell, so be honest.
+            return [
+                'message' => "This file ({$fileSize}) is larger than any of our plans can handle. Please get in touch and we'll help.",
+                'is_limit_error' => true,
+                'upgrade_url' => route('subscription.pricing'),
+            ];
+        }
+
+        $price = $plan->getFormattedPriceForCountry($user->country_code ?? 'US');
+
+        return [
+            'message' => "Your {$fileSize} file needs the {$plan->name} plan ({$price}/mo). Your current limit is {$this->formatFileSize($maxSize)}.",
+            'is_limit_error' => true,
+            'recommended_plan' => $plan->slug,
+            'recommended_plan_name' => $plan->name,
+            'recommended_plan_price' => $price,
+            'file_size' => $fileSize,
+            'current_limit' => $this->formatFileSize($maxSize),
+            'upgrade_url' => route('subscription.pricing', ['recommended' => $plan->slug]),
+        ];
     }
 
     private function formatFileSize(int $bytes): string

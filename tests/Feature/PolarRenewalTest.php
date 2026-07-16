@@ -125,6 +125,118 @@ class PolarRenewalTest extends TestCase
         $this->assertSame(1, PaymentTransaction::where('type', 'renewal')->count(), 'renewal must not be recorded twice');
     }
 
+    public function test_a_brand_new_subscription_does_not_record_a_phantom_renewal(): void
+    {
+        // The exact production scenario: on a new subscription the success-redirect
+        // sync and the subscription.created webhook both run for the same Polar id.
+        // They report the SAME period end in different string formats. The old
+        // string comparison treated the second as a renewal; it must not.
+        $plan = $this->proPlan();
+        $user = User::factory()->create();
+
+        $periodEndCreated = '2026-08-16T03:41:12+00:00'; // e.g. Polar ->format('c')
+        $periodEndSynced = '2026-08-16T03:41:12Z';       // same instant, different string
+
+        $created = [
+            'type' => 'subscription.created',
+            'data' => [
+                'id' => self::POLAR_SUB_ID,
+                'status' => 'active',
+                'product_id' => self::OUR_PRODUCT,
+                'current_period_end' => $periodEndCreated,
+                'customer' => ['external_id' => (string) $user->id],
+                'metadata' => ['user_id' => (string) $user->id, 'plan_id' => (string) $plan->id],
+            ],
+        ];
+
+        $polar = app(PolarService::class);
+        $polar->handleWebhook($created);
+
+        // Second pass for the same subscription, same period, different format.
+        $polar->handleWebhook($this->updatedEvent([
+            'customer' => ['external_id' => (string) $user->id],
+            'current_period_end' => $periodEndSynced,
+        ]));
+
+        $this->assertSame(
+            0,
+            PaymentTransaction::where('type', 'renewal')->count(),
+            'creating a subscription must not look like a renewal'
+        );
+        $this->assertSame('active', UserSubscription::where('provider_subscription_id', self::POLAR_SUB_ID)->value('status'));
+    }
+
+    public function test_purge_command_deletes_creation_time_renewals_but_keeps_genuine_ones(): void
+    {
+        $plan = $this->proPlan();
+        $user = User::factory()->create();
+
+        $sub = UserSubscription::create([
+            'user_id' => $user->id,
+            'subscription_plan_id' => $plan->id,
+            'payment_provider' => 'polar',
+            'provider_subscription_id' => self::POLAR_SUB_ID,
+            'status' => 'active',
+            'started_at' => now()->subMonth(),
+            'expires_at' => now()->addMonth(),
+            'transfers_used' => 0,
+            'amount_paid' => 10,
+            'currency' => 'USD',
+        ]);
+
+        // Initial subscription charge at signup.
+        $signup = PaymentTransaction::create([
+            'user_id' => $user->id, 'user_subscription_id' => $sub->id, 'provider' => 'polar',
+            'provider_reference' => 'wetodrive_polar_signup', 'type' => 'subscription',
+            'status' => 'success', 'amount' => 10, 'currency' => 'USD',
+        ]);
+        // Phantom renewal, same second as the signup charge.
+        $phantom = PaymentTransaction::create([
+            'user_id' => $user->id, 'user_subscription_id' => $sub->id, 'provider' => 'polar',
+            'provider_reference' => 'renewal_phantom', 'type' => 'renewal',
+            'status' => 'success', 'amount' => 10, 'currency' => 'USD',
+        ]);
+        // Genuine renewal a month later (created_at isn't fillable, so set it directly).
+        $genuine = PaymentTransaction::create([
+            'user_id' => $user->id, 'user_subscription_id' => $sub->id, 'provider' => 'polar',
+            'provider_reference' => 'renewal_real', 'type' => 'renewal',
+            'status' => 'success', 'amount' => 10, 'currency' => 'USD',
+        ]);
+        \DB::table('payment_transactions')->where('id', $genuine->id)->update(['created_at' => now()->addMonth()]);
+
+        $this->artisan('polar:purge-phantom-renewals')->assertSuccessful();
+
+        $this->assertNull(PaymentTransaction::find($phantom->id), 'creation-time renewal removed');
+        $this->assertNotNull(PaymentTransaction::find($genuine->id), 'genuine renewal kept');
+        $this->assertNotNull(PaymentTransaction::find($signup->id), 'subscription charge kept');
+    }
+
+    public function test_purge_command_dry_run_deletes_nothing(): void
+    {
+        $plan = $this->proPlan();
+        $user = User::factory()->create();
+        $sub = UserSubscription::create([
+            'user_id' => $user->id, 'subscription_plan_id' => $plan->id, 'payment_provider' => 'polar',
+            'provider_subscription_id' => self::POLAR_SUB_ID, 'status' => 'active',
+            'started_at' => now()->subMonth(), 'expires_at' => now()->addMonth(),
+            'transfers_used' => 0, 'amount_paid' => 10, 'currency' => 'USD',
+        ]);
+        PaymentTransaction::create([
+            'user_id' => $user->id, 'user_subscription_id' => $sub->id, 'provider' => 'polar',
+            'provider_reference' => 'wetodrive_polar_signup', 'type' => 'subscription',
+            'status' => 'success', 'amount' => 10, 'currency' => 'USD',
+        ]);
+        $phantom = PaymentTransaction::create([
+            'user_id' => $user->id, 'user_subscription_id' => $sub->id, 'provider' => 'polar',
+            'provider_reference' => 'renewal_phantom', 'type' => 'renewal',
+            'status' => 'success', 'amount' => 10, 'currency' => 'USD',
+        ]);
+
+        $this->artisan('polar:purge-phantom-renewals --dry-run')->assertSuccessful();
+
+        $this->assertNotNull(PaymentTransaction::find($phantom->id), 'dry run must not delete');
+    }
+
     public function test_event_for_a_foreign_product_is_ignored(): void
     {
         $plan = $this->proPlan();

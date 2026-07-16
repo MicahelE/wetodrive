@@ -561,8 +561,12 @@
 
         <div class="pricing-grid">
             @foreach($plans as $plan)
-                <div class="pricing-card {{ $plan->slug === 'pro' ? 'popular' : '' }}">
-                    @if($plan->slug === 'pro')
+                @php($isRecommended = isset($recommended) && $recommended === $plan->slug)
+                <div class="pricing-card {{ $isRecommended || $plan->slug === 'pro' ? 'popular' : '' }}"
+                     @if($isRecommended) style="outline: 3px solid #28a745; outline-offset: 2px;" @endif>
+                    @if($isRecommended)
+                        <div class="popular-badge" style="background: #28a745;">Recommended for your file</div>
+                    @elseif($plan->slug === 'pro')
                         <div class="popular-badge">Most Popular</div>
                     @endif
 

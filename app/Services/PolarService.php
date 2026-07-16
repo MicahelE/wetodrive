@@ -7,6 +7,7 @@ use App\Models\PaymentTransaction;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\UserSubscription;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Polar\Models\Components\CheckoutCreate;
@@ -206,7 +207,7 @@ class PolarService
     private function applyPolarState(UserSubscription $subscription, array $data): void
     {
         $renewsAt = $data['current_period_end'] ?? null;
-        $previousPeriodEnd = $subscription->expires_at?->toIso8601String();
+        $previousPeriodEnd = $subscription->expires_at; // keep as Carbon, read before the update below
         $mappedStatus = isset($data['status'])
             ? $this->mapPolarStatus($data['status'])
             : $subscription->status;
@@ -241,9 +242,17 @@ class PolarService
         }
 
         // Record a renewal (resets transfers + a renewal transaction) only when
-        // the billing period actually advanced.
-        if ($previousPeriodEnd && $renewsAt && $renewsAt !== $previousPeriodEnd) {
-            $this->recordRenewal($subscription, $renewsAt);
+        // the billing period actually advanced. Compare instants, not strings:
+        // on creation the initial sync and the subscription.created webhook both
+        // describe the SAME period end in different formats (Polar's ->format('c')
+        // vs Carbon's serialization), so a raw string !== wrongly fired a renewal
+        // on every new subscription. A real monthly renewal moves the period end
+        // forward by weeks; the one-day tolerance ignores same-period jitter.
+        if ($previousPeriodEnd && $renewsAt) {
+            $newEnd = Carbon::parse($renewsAt);
+            if ($newEnd->greaterThan($previousPeriodEnd->copy()->addDay())) {
+                $this->recordRenewal($subscription, $renewsAt);
+            }
         }
     }
 

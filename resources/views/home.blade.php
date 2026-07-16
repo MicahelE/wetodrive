@@ -1058,13 +1058,16 @@
                                 </div>
                             `;
                         } else if (error.is_limit_error && error.upgrade_url) {
-                            // File size limit error - yellow warning box with upgrade link
+                            // File size limit error - yellow warning box naming the plan the file needs.
+                            const ctaLabel = error.recommended_plan_name
+                                ? `See ${error.recommended_plan_name} plan`
+                                : 'See plans';
                             document.getElementById('completionMessage').innerHTML = `
                                 <div style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 15px; border-radius: 8px;">
                                     <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">File Too Large</div>
                                     <div style="margin-bottom: 15px;">${error.error || 'File exceeds your plan limit.'}</div>
                                     <a href="${error.upgrade_url}" style="display: inline-block; background: #28a745; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-right: 10px;">
-                                        Upgrade Plan
+                                        ${ctaLabel}
                                     </a>
                                     <button onclick="resetTransferForm()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
                                         Try Different File
