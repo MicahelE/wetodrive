@@ -228,12 +228,19 @@ class PolarService
         // it, or the user gets stamped back to the plan they just upgraded away from.
         $incoming = $this->resolvePlanFromProduct($data['product_id'] ?? null);
         if ($incoming && (int) $incoming->id !== (int) $subscription->subscription_plan_id) {
-            $subscription->update(['subscription_plan_id' => $incoming->id]);
+            // amount_paid has to move with the plan: the dashboard prints it as the
+            // monthly price, and recordRenewal() bills future renewals from it, so
+            // leaving it behind reports a $80 Premium customer as paying $10.
+            $subscription->update([
+                'subscription_plan_id' => $incoming->id,
+                'amount_paid' => $incoming->price_usd,
+            ]);
             $subscription->setRelation('subscriptionPlan', $incoming);
 
             Log::info('Polar subscription plan changed', [
                 'subscription_id' => $subscription->id,
                 'plan' => $incoming->slug,
+                'amount' => $incoming->price_usd,
             ]);
         }
 
@@ -599,7 +606,7 @@ class PolarService
             // Uncancel first. A subscription set to cancel at period end is still
             // "active" to Polar, but upgrading someone onto a plan that still shuts
             // off at the old period end is not an upgrade.
-            if ($subscription->metadata['cancel_at_period_end'] ?? false) {
+            if ($subscription->isSetToCancel()) {
                 $this->client()->subscriptions->update(
                     new SubscriptionCancel(cancelAtPeriodEnd: false),
                     $subscription->provider_subscription_id,

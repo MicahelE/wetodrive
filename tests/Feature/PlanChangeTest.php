@@ -98,6 +98,9 @@ class PlanChangeTest extends TestCase
 
         $this->assertSame($premium->id, $sub->subscription_plan_id, 'subscription should follow the product');
         $this->assertSame('premium', $user->subscription_tier, 'user tier should follow the plan');
+        // The dashboard prints amount_paid as the monthly price and recordRenewal()
+        // bills renewals from it, so a stale $10 would misreport an $80 customer.
+        $this->assertSame('80.00', (string) $sub->amount_paid, 'price should follow the plan');
         $this->assertSame(
             0,
             PaymentTransaction::where('type', 'renewal')->count(),
@@ -129,6 +132,41 @@ class PlanChangeTest extends TestCase
         $this->actingAs($user)
             ->post(route('subscription.subscribe'), ['plan_id' => $premium->id])
             ->assertRedirect(route('subscription.confirm-change', ['plan' => $premium->id]));
+    }
+
+    public function test_a_freshly_cancelled_subscription_is_known_to_be_set_to_cancel(): void
+    {
+        // Regression: cancelSubscription() flips our status but does not refresh
+        // metadata, so cancel_at_period_end is still false until a webhook lands.
+        // Reading metadata alone made changePlan() skip the uncancel, which would
+        // have upgraded the customer and still shut them off at period end.
+        [$pro] = $this->plans();
+        [, $sub] = $this->proSubscriber($pro);
+
+        $sub->update([
+            'status' => 'cancelled',
+            'metadata' => ['cancel_at_period_end' => false],
+        ]);
+
+        $this->assertTrue($sub->isSetToCancel(), 'a cancelled sub is set to cancel even with stale metadata');
+
+        $sub->update(['status' => 'active', 'metadata' => ['cancel_at_period_end' => true]]);
+        $this->assertTrue($sub->isSetToCancel(), 'metadata alone is still enough');
+
+        $sub->update(['status' => 'active', 'metadata' => []]);
+        $this->assertFalse($sub->isSetToCancel(), 'a plain active sub is not set to cancel');
+    }
+
+    public function test_the_confirm_page_warns_a_cancelled_user_that_upgrading_restarts_the_subscription(): void
+    {
+        [$pro, $premium] = $this->plans();
+        [$user, $sub] = $this->proSubscriber($pro);
+        $sub->update(['status' => 'cancelled', 'metadata' => ['cancel_at_period_end' => false]]);
+
+        $this->actingAs($user)
+            ->get(route('subscription.confirm-change', ['plan' => $premium->id]))
+            ->assertOk()
+            ->assertSee('This restarts your subscription');
     }
 
     public function test_the_confirm_page_names_the_plan_and_the_estimate(): void

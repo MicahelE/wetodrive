@@ -72,6 +72,19 @@ class UserSubscription extends Model
         return $this->status === 'cancelled';
     }
 
+    /**
+     * Is this subscription due to stop at the end of the paid period?
+     *
+     * Our own status is the reliable signal: metadata only learns
+     * cancel_at_period_end from a webhook, so it is still false right after a
+     * cancellation. Trusting metadata alone means an upgrade skips the uncancel
+     * and the customer gets shut off anyway.
+     */
+    public function isSetToCancel(): bool
+    {
+        return $this->isCancelled() || ($this->metadata['cancel_at_period_end'] ?? false);
+    }
+
     public function getRemainingTransfers(): ?int
     {
         if ($this->subscriptionPlan->isUnlimitedTransfers()) {

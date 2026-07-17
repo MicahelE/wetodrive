@@ -105,7 +105,7 @@
                     {{ $newPlan->isUnlimitedTransfers() ? 'Unlimited' : $newPlan->transfer_limit . ' per month' }}
                 </span>
             </li>
-            @if($subscription->metadata['cancel_at_period_end'] ?? false)
+            @if($subscription->isSetToCancel())
                 <li>
                     <span class="label">Your cancellation</span>
                     <span class="value">This restarts your subscription, so it won't end on {{ $subscription->expires_at?->format('M j, Y') }}.</span>
