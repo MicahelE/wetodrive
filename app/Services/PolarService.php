@@ -128,7 +128,7 @@ class PolarService
             $mutatingEvents = [
                 'subscription.created', 'subscription.active', 'subscription.updated',
                 'subscription.canceled', 'subscription.cancelled', 'subscription.revoked',
-                'order.created', 'order.paid',
+                'order.created', 'order.paid', 'order.updated',
             ];
 
             if (in_array($eventName, $mutatingEvents, true) && !$this->eventBelongsToWeToDrive($eventData)) {
@@ -154,8 +154,11 @@ class PolarService
                 case 'subscription.revoked':
                     return $this->handleSubscriptionRevoked($eventData);
 
+                // Polar only ever sends order.updated in practice (never
+                // order.created/paid), so it is the real recording trigger.
                 case 'order.created':
                 case 'order.paid':
+                case 'order.updated':
                     return $this->handleOrderPaid($eventData);
 
                 default:
@@ -341,30 +344,97 @@ class PolarService
 
     private function handleOrderPaid(array $data): bool
     {
-        $metadata = $data['metadata'] ?? [];
-        $transactionId = $metadata['transaction_id'] ?? null;
-
-        if (!$transactionId) {
-            Log::info('Polar order event missing transaction_id metadata', [
-                'polar_order_id' => $data['id'] ?? null,
-            ]);
+        // order.updated fires repeatedly through an order's life; only a paid
+        // order is money.
+        $isPaid = ($data['paid'] ?? false) === true || ($data['status'] ?? null) === 'paid';
+        if (!$isPaid) {
             return true;
         }
 
-        $transaction = PaymentTransaction::find($transactionId);
+        // Branch on the billing reason, NOT on metadata: an upgrade order inherits
+        // the subscription's original checkout metadata (including the initial
+        // transaction_id, already marked success), so keying off transaction_id
+        // would silently swallow the upgrade charge.
+        $reason = $data['billing_reason'] ?? null;
 
-        if ($transaction && $transaction->status === 'pending') {
-            $transaction->update([
+        // Renewals are recorded by recordRenewal() from subscription.updated;
+        // recording the subscription_cycle order too would double-count them.
+        if ($reason === 'subscription_cycle') {
+            return true;
+        }
+
+        // Initial checkout: our checkout stamped transaction_id and left a pending
+        // row to flip to success. Only subscription_create reaches a pending row;
+        // for any other reason that row is already success and this no-ops.
+        if ($reason !== 'subscription_update') {
+            $transactionId = ($data['metadata'] ?? [])['transaction_id'] ?? null;
+            if ($transactionId) {
+                $transaction = PaymentTransaction::find($transactionId);
+
+                if ($transaction && $transaction->status === 'pending') {
+                    $transaction->update([
+                        'status' => 'success',
+                        'paid_at' => now(),
+                        'provider_response' => $data,
+                    ]);
+
+                    Log::info('Polar order marked as paid', [
+                        'transaction_id' => $transaction->id,
+                        'polar_order_id' => $data['id'] ?? null,
+                    ]);
+                }
+            }
+
+            return true;
+        }
+
+        // A plan-change proration (subscription_update) has no checkout and no
+        // pending row, so this is its only recording path.
+        $orderId = $data['id'] ?? null;
+        if (!$orderId) {
+            return true;
+        }
+
+        // The unique provider_reference makes repeated order.updated events for
+        // the same order idempotent.
+        $reference = 'polar_order_' . $orderId;
+        if (PaymentTransaction::where('provider_reference', $reference)->exists()) {
+            return true;
+        }
+
+        $subscription = UserSubscription::where('provider_subscription_id', $data['subscription_id'] ?? null)
+            ->where('payment_provider', 'polar')
+            ->first();
+
+        $userId = ($data['customer']['external_id'] ?? null) ?: $subscription?->user_id;
+        if (!$userId) {
+            Log::warning('Polar upgrade order has no resolvable user', ['polar_order_id' => $orderId]);
+            return true;
+        }
+
+        try {
+            PaymentTransaction::create([
+                'user_id' => $userId,
+                'user_subscription_id' => $subscription?->id,
+                'provider' => 'polar',
+                'provider_reference' => $reference,
+                'type' => 'upgrade',
                 'status' => 'success',
+                'amount' => ($data['total_amount'] ?? 0) / 100, // Polar amounts are cents
+                'currency' => strtoupper($data['currency'] ?? 'USD'),
                 'paid_at' => now(),
                 'provider_response' => $data,
             ]);
-
-            Log::info('Polar order marked as paid', [
-                'transaction_id' => $transaction->id,
-                'polar_order_id' => $data['id'] ?? null,
-            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Unique reference => a concurrent event already recorded it.
+            return true;
         }
+
+        Log::info('Polar upgrade charge recorded', [
+            'polar_order_id' => $orderId,
+            'user_id' => $userId,
+            'amount' => ($data['total_amount'] ?? 0) / 100,
+        ]);
 
         return true;
     }

@@ -108,6 +108,127 @@ class PlanChangeTest extends TestCase
         );
     }
 
+    private function orderEvent(array $overrides = []): array
+    {
+        return [
+            'type' => 'order.updated',
+            'data' => array_merge([
+                'id' => 'polar_order_xyz',
+                'status' => 'paid',
+                'paid' => true,
+                'billing_reason' => 'subscription_update',
+                'total_amount' => 7000, // cents
+                'currency' => 'usd',
+                'product_id' => self::PREMIUM_PRODUCT,
+                'subscription_id' => self::POLAR_SUB_ID,
+                'customer' => ['external_id' => null],
+                // Real upgrade orders INHERIT the subscription's original checkout
+                // metadata, so transaction_id points at the already-paid initial
+                // charge. The handler must branch on billing_reason, not this.
+                'metadata' => ['transaction_id' => '999', 'plan_id' => '2', 'user_id' => '382'],
+            ], $overrides),
+        ];
+    }
+
+    public function test_a_paid_upgrade_order_is_recorded_as_a_payment(): void
+    {
+        // Polar sends order.updated (never order.paid/created) and an upgrade
+        // proration has no pending row, so this webhook is the ONLY record of the
+        // real money charged. #382's $70 was silently lost before this.
+        [$pro, $premium] = $this->plans();
+        [$user, $sub] = $this->proSubscriber($pro);
+
+        // The initial $10 charge, already success, is what the inherited
+        // transaction_id in the upgrade order points at. It must be left alone.
+        $initial = PaymentTransaction::create([
+            'user_id' => $user->id, 'user_subscription_id' => $sub->id, 'provider' => 'polar',
+            'provider_reference' => 'wetodrive_polar_initial', 'type' => 'subscription',
+            'status' => 'success', 'amount' => 10, 'currency' => 'USD',
+        ]);
+
+        app(PolarService::class)->handleWebhook($this->orderEvent([
+            'customer' => ['external_id' => (string) $user->id],
+            'metadata' => ['transaction_id' => (string) $initial->id],
+        ]));
+
+        $txns = PaymentTransaction::where('type', 'upgrade')->get();
+        $this->assertCount(1, $txns);
+        $this->assertSame('70.00', (string) $txns->first()->amount, 'cents converted to dollars');
+        $this->assertSame('success', $txns->first()->status);
+        $this->assertSame($user->id, (int) $txns->first()->user_id);
+        $this->assertSame($sub->id, (int) $txns->first()->user_subscription_id);
+        // The inherited transaction_id must not have been touched.
+        $this->assertSame('success', $initial->fresh()->status);
+        $this->assertSame('10.00', (string) $initial->fresh()->amount);
+    }
+
+    public function test_repeated_order_updated_events_record_the_charge_once(): void
+    {
+        [$pro] = $this->plans();
+        [$user] = $this->proSubscriber($pro);
+        $polar = app(PolarService::class);
+
+        $event = $this->orderEvent(['customer' => ['external_id' => (string) $user->id]]);
+        $polar->handleWebhook($event);
+        $polar->handleWebhook($event);
+        $polar->handleWebhook($event);
+
+        $this->assertSame(1, PaymentTransaction::where('type', 'upgrade')->count(), 'idempotent on order id');
+    }
+
+    public function test_a_renewal_order_is_not_recorded_here_to_avoid_double_counting(): void
+    {
+        // Renewals are recorded by recordRenewal() from subscription.updated;
+        // recording the subscription_cycle order too would count them twice.
+        [$pro] = $this->plans();
+        [$user] = $this->proSubscriber($pro);
+
+        app(PolarService::class)->handleWebhook($this->orderEvent([
+            'billing_reason' => 'subscription_cycle',
+            'customer' => ['external_id' => (string) $user->id],
+        ]));
+
+        $this->assertSame(0, PaymentTransaction::count(), 'renewal orders are left to recordRenewal');
+    }
+
+    public function test_an_unpaid_order_update_records_nothing(): void
+    {
+        [$pro] = $this->plans();
+        [$user] = $this->proSubscriber($pro);
+
+        app(PolarService::class)->handleWebhook($this->orderEvent([
+            'status' => 'pending',
+            'paid' => false,
+            'customer' => ['external_id' => (string) $user->id],
+        ]));
+
+        $this->assertSame(0, PaymentTransaction::count(), 'only paid orders are money');
+    }
+
+    public function test_an_initial_checkout_order_still_marks_its_pending_row_paid(): void
+    {
+        // The pre-existing path: our checkout stamps transaction_id and leaves a
+        // pending row for the order webhook to flip to success.
+        [$pro] = $this->plans();
+        [$user, $sub] = $this->proSubscriber($pro);
+
+        $pending = PaymentTransaction::create([
+            'user_id' => $user->id, 'user_subscription_id' => $sub->id, 'provider' => 'polar',
+            'provider_reference' => 'wetodrive_polar_signup', 'type' => 'subscription',
+            'status' => 'pending', 'amount' => 10, 'currency' => 'USD',
+        ]);
+
+        app(PolarService::class)->handleWebhook($this->orderEvent([
+            'billing_reason' => 'subscription_create',
+            'total_amount' => 1000,
+            'metadata' => ['transaction_id' => (string) $pending->id],
+            'customer' => ['external_id' => (string) $user->id],
+        ]));
+
+        $this->assertSame('success', $pending->fresh()->status);
+        $this->assertSame(0, PaymentTransaction::where('type', 'upgrade')->count(), 'no duplicate upgrade row');
+    }
+
     public function test_an_existing_polar_subscriber_is_sent_to_confirm_instead_of_a_doomed_checkout(): void
     {
         [$pro, $premium] = $this->plans();
