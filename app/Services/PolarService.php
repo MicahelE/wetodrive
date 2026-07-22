@@ -652,6 +652,42 @@ class PolarService
     }
 
     /**
+     * Terminate a Polar subscription immediately. Used when an account is being
+     * deleted: unlike cancelSubscription() (cancel at period end), this stops the
+     * subscription now so nothing keeps billing against a deleted account.
+     */
+    public function revokeSubscription(UserSubscription $subscription): bool
+    {
+        if ($subscription->payment_provider !== 'polar' || !$subscription->provider_subscription_id) {
+            return false;
+        }
+
+        try {
+            $this->client()->subscriptions->revoke($subscription->provider_subscription_id);
+
+            Log::info('Polar subscription revoked (account deletion)', [
+                'subscription_id' => $subscription->id,
+                'polar_id' => $subscription->provider_subscription_id,
+            ]);
+
+            return true;
+        } catch (APIException $e) {
+            Log::error('Failed to revoke Polar subscription', [
+                'subscription_id' => $subscription->id,
+                'status' => $e->statusCode,
+                'body' => $e->body,
+            ]);
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Failed to revoke Polar subscription', [
+                'subscription_id' => $subscription->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
      * Move an existing Polar subscription onto another plan's product.
      *
      * Polar refuses to confirm a second checkout while a customer already has a

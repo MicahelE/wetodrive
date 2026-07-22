@@ -6,8 +6,11 @@ use App\Models\User;
 use App\Models\UserSubscription;
 use App\Models\PaymentTransaction;
 use App\Models\SubscriptionPlan;
+use App\Services\PolarService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AdminController extends Controller
 {
@@ -118,6 +121,41 @@ class AdminController extends Controller
         $user->save();
 
         return redirect()->back()->with('success', "Trial transfer has been granted to {$user->name}.");
+    }
+
+    public function destroyUser(Request $request, User $user, PolarService $polar)
+    {
+        // ponytail: the self-guard alone keeps the last admin safe — deleting any
+        // other admin always leaves the acting admin, so this endpoint can never
+        // remove the final admin. No separate last-admin check needed.
+        if ($user->id === Auth::id()) {
+            return redirect()->back()->with('error', "You can't delete your own account.");
+        }
+
+        // Stop billing before the record is gone. Revoke every Polar subscription
+        // that could still charge; late webhooks safely no-op once the row is gone.
+        $liveSubs = $user->subscriptions()
+            ->where('payment_provider', 'polar')
+            ->whereNotNull('provider_subscription_id')
+            ->whereIn('status', ['active', 'cancelled'])
+            ->get();
+
+        foreach ($liveSubs as $sub) {
+            $polar->revokeSubscription($sub);
+        }
+
+        $name = $user->name;
+
+        // Hard delete: DB cascades transfers + subscriptions; payment history is
+        // detached (user_id -> null) so revenue records survive.
+        $user->delete();
+
+        Log::info('Admin deleted user account', [
+            'deleted_user' => $user->id,
+            'by_admin' => Auth::id(),
+        ]);
+
+        return redirect()->route('admin.users')->with('success', "{$name}'s account has been deleted.");
     }
 
     public function subscriptions(Request $request)

@@ -207,5 +207,14 @@
             <button type="submit" class="btn btn-warning">Remove Admin</button>
         </form>
     @endif
+
+    @if($user->id !== Auth::id())
+        <form method="POST" action="{{ route('admin.users.destroy', $user) }}" style="display: inline;"
+              onsubmit="return confirm('Permanently delete {{ $user->email }}? This removes their account, transfers, and subscriptions and cannot be undone.')">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="btn btn-danger">Delete Account</button>
+        </form>
+    @endif
 </div>
 @endsection

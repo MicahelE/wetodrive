@@ -43,8 +43,8 @@
             <td>{{ $transaction->created_at->format('M j, Y H:i') }}</td>
             <td>
                 <div>
-                    <strong>{{ $transaction->user->name }}</strong><br>
-                    <small style="color: #666;">{{ $transaction->user->email }}</small>
+                    <strong>{{ $transaction->user->name ?? 'Deleted user' }}</strong><br>
+                    <small style="color: #666;">{{ $transaction->user->email ?? '—' }}</small>
                 </div>
             </td>
             <td>{{ $transaction->userSubscription->subscriptionPlan->name ?? 'N/A' }}</td>

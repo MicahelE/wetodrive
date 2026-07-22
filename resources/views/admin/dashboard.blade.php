@@ -77,7 +77,7 @@
             <tbody>
                 @foreach($recent_transactions as $transaction)
                 <tr>
-                    <td>{{ $transaction->user->name }}</td>
+                    <td>{{ $transaction->user->name ?? 'Deleted user' }}</td>
                     <td>{{ $transaction->getFormattedAmount() }}</td>
                     <td>
                         <span class="badge badge-info">{{ ucfirst($transaction->provider) }}</span>
