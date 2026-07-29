@@ -16,7 +16,7 @@ class CheckInMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Quick Check-In — How\'s Your WeToDrive Experience?');
+        return new Envelope(subject: 'Quick Check-In: How\'s Your WeToDrive Experience?');
     }
 
     public function content(): Content

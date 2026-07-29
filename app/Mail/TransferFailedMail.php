@@ -20,7 +20,7 @@ class TransferFailedMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Transfer Failed — ' . $this->filename);
+        return new Envelope(subject: 'Transfer Failed: ' . $this->filename);
     }
 
     public function content(): Content
