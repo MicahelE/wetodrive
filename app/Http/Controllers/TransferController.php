@@ -37,9 +37,16 @@ class TransferController extends Controller
      */
     public function indexV2()
     {
-        // Real numbers, not marketing fiction — the trust section prints these.
+        // Live figures from this database. On production that is production data;
+        // locally it is a near-empty dev db, which is why the view hides these
+        // entirely when there is nothing real to show.
+        //
+        // Transfer count and byte total both come from the transfers table so they
+        // stay consistent with each other. Note users.total_transfers sums higher
+        // (144 vs 130 rows in prod as of 2026-08-13), so both figures here are a
+        // conservative floor. The view says "over" for that reason.
         $stats = Cache::remember('home-v2-stats', now()->addMinutes(10), fn () => [
-            'users' => User::count(),
+            'accounts' => User::count(),
             'transfers' => Transfer::count(),
             'bytes' => (int) Transfer::sum('file_size'),
         ]);

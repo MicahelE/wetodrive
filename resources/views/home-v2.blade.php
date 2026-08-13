@@ -3,12 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WetoDrive - WeTransfer straight to Google Drive</title>
+    {{-- Title is byte-for-byte the live homepage's. Do not "improve" it: it is the
+         string currently ranking, and this page is meant to replace that one. --}}
+    <title>WetoDrive - WeTransfer to Google Drive</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="description" content="Paste a WeTransfer link and it lands in your Google Drive. Nothing downloads to your device, nothing is stored on our servers.">
-    <meta name="robots" content="noindex">{{-- staging page, keep it out of search --}}
+
+    {{-- The live homepage carries none of the following. The SEO landing pages all do
+         (see SeoController), so this matches their pattern rather than inventing one. --}}
+    <meta name="description" content="Transfer files from WeTransfer to Google Drive instantly. WetoDrive saves WeTransfer files directly to your Google Drive with no downloading and uploading, and no storage used on your device.">
+    <meta name="keywords" content="wetransfer to google drive, save wetransfer to google drive, wetransfer google drive, transfer files from wetransfer, wetransfer alternative, wetransfer download, save wetransfer files, wetransfer to drive">
+    <link rel="canonical" href="{{ route('home') }}">
+
+    <meta property="og:title" content="WetoDrive - WeTransfer to Google Drive">
+    <meta property="og:description" content="Transfer files from WeTransfer to Google Drive instantly. No downloading and uploading, no storage used on your device.">
+    <meta property="og:url" content="{{ route('home') }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="WetoDrive">
+    <meta property="og:image" content="{{ asset('logo.svg') }}">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="WetoDrive - WeTransfer to Google Drive">
+    <meta name="twitter:description" content="Transfer files from WeTransfer to Google Drive instantly. No downloading and uploading, no storage used on your device.">
+
+    {{-- Staging only. Delete this line at the moment this becomes the real homepage,
+         otherwise it will deindex the page we are trying to preserve rankings for. --}}
+    <meta name="robots" content="noindex">
+
+    {{-- No favicon.ico link: the file is an svg with an .ico extension and 404s,
+         so the live homepage's reference to it is a wasted request. --}}
     <link rel="icon" type="image/svg+xml" href="{{ asset('logo-mark.svg') }}">
+    <link rel="apple-touch-icon" href="{{ asset('logo-mark.svg') }}">
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <meta name="theme-color" content="#0A0F24">
+
+    {{-- The @@ escapes are required: Blade reads a bare @context / @type as a
+         directive and refuses to compile the page. @@ emits a literal @. --}}
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "SoftwareApplication",
+        "name": "WetoDrive",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Web",
+        "url": "{{ route('home') }}",
+        "description": "Transfer files from WeTransfer to Google Drive instantly, without downloading and uploading.",
+        "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free plan available" }
+    }
+    </script>
 
     <style>
         :root {
@@ -446,9 +487,12 @@
 
             <h1><span class="nw">Your WeTransfer link,</span><br><span class="grad">straight into Drive.</span></h1>
 
+            {{-- First sentence is the live homepage's tagline, word for word. It is the
+                 page's main keyword string and the thing the description tag echoes. --}}
             <p class="lede">
-                Paste the link. We stream the files directly from WeTransfer into your Google Drive
-                while you get on with your day. Nothing touches your hard drive.
+                Transfer files from WeTransfer to Google Drive instantly. Paste the link and the
+                files stream straight into your Drive, with no downloading and uploading and no
+                storage used on your device.
             </p>
 
             <div class="hero-cta">
@@ -463,7 +507,7 @@
                             <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                             <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                         </svg>
-                        Continue with Google
+                        Get Started with Google Drive
                     </a>
                     <a href="#how" class="btn btn-ghost btn-lg">See how it works</a>
                 @endauth
@@ -503,9 +547,15 @@
 
                 <div class="node" id="nodeTo">
                     <div class="node-ico">
-                        <svg width="42" height="42" viewBox="0 0 48 48" fill="none">
-                            <path class="drive-fill" d="M24 9 L40 36 a2 2 0 0 1-1.7 3 H9.7 A2 2 0 0 1 8 36 Z" fill="#34A853"/>
-                            <path d="M24 9 L40 36 a2 2 0 0 1-1.7 3 H9.7 A2 2 0 0 1 8 36 Z" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="2"/>
+                        {{-- The real Google Drive mark: three folded panels, not a plain triangle.
+                             Nominative use, same as the Google G on the sign-in button. --}}
+                        <svg class="drive-fill" width="42" height="38" viewBox="0 0 87.3 78" fill="none">
+                            <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                            <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" fill="#00ac47"/>
+                            <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+                            <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                            <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                            <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
                         </svg>
                     </div>
                     <div class="node-t">Google Drive</div>
@@ -516,7 +566,7 @@
             <div class="stage-foot">
                 <span>Streamed, never stored <b>·</b> 0 bytes on your device</span>
                 @if ($stats['bytes'] > 1073741824)
-                    <span><b>{{ number_format($stats['bytes'] / 1073741824) }}</b> GB moved so far</span>
+                    <span>over <b>{{ number_format(floor($stats['bytes'] / 1073741824)) }}</b> GB moved</span>
                 @endif
             </div>
         </div>
@@ -650,17 +700,19 @@
 <section style="padding-top:0;">
     <div class="wrap">
         <div class="stats">
+            {{-- Labels say exactly what each number counts. "Accounts connected" is not
+                 "active users", and the GB total is a floor, hence "over". --}}
             <div class="stat reveal">
-                <div class="stat-v" data-count="{{ $stats['users'] }}">0</div>
-                <div class="stat-l">People using WetoDrive</div>
+                <div class="stat-v" data-count="{{ $stats['accounts'] }}">0</div>
+                <div class="stat-l">Google accounts connected</div>
             </div>
             <div class="stat reveal" style="transition-delay:.1s">
                 <div class="stat-v" data-count="{{ $stats['transfers'] }}">0</div>
-                <div class="stat-l">Transfers completed</div>
+                <div class="stat-l">Transfers delivered to Drive</div>
             </div>
             <div class="stat reveal" style="transition-delay:.2s">
-                <div class="stat-v" data-count="{{ (int) round($stats['bytes'] / 1073741824) }}" data-suffix=" GB">0</div>
-                <div class="stat-l">Moved into Drive</div>
+                <div class="stat-v" data-count="{{ (int) floor($stats['bytes'] / 1073741824) }}" data-prefix="over " data-suffix=" GB">0</div>
+                <div class="stat-l">Moved from WeTransfer to Google Drive</div>
             </div>
         </div>
     </div>
@@ -680,15 +732,15 @@
                 <div class="feat-ico">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A5B4FC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                 </div>
-                <h3>Files up to 500GB</h3>
-                <p>Raw footage, photo shoots, project archives. Premium handles half a terabyte in one go.</p>
+                <h3>Instant Transfer</h3>
+                <p>No more manual downloading and uploading. Transfer files directly from WeTransfer to Google Drive, at sizes up to 500GB.</p>
             </div>
             <div class="feat reveal" style="transition-delay:.06s">
                 <div class="feat-ico">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A5B4FC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.2-8.6"/><path d="M22 4 12 14.01l-3-3"/></svg>
                 </div>
-                <h3>Nothing on your device</h3>
-                <p>The file never lands on your laptop. Great for a full SSD, a slow connection, or a phone.</p>
+                <h3>Save Storage</h3>
+                <p>Files stream directly to your Google Drive without taking up space on your device. Great for a full SSD, a slow connection, or a phone.</p>
             </div>
             <div class="feat reveal" style="transition-delay:.12s">
                 <div class="feat-ico">
@@ -715,8 +767,8 @@
                 <div class="feat-ico">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A5B4FC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 </div>
-                <h3>A real person replies</h3>
-                <p>Reply to any email from us and it reaches the person who built this. Usually same day.</p>
+                <h3>Fast &amp; Secure</h3>
+                <p>Powered by Google's secure infrastructure with enterprise-grade encryption. Reply to any email from us and it reaches the person who built this.</p>
             </div>
         </div>
     </div>
@@ -862,28 +914,33 @@
                 </a>
             </div>
 
+            {{-- Anchor text below is copied verbatim from the live homepage footer.
+                 These are the only internal links the SEO landing pages get from the
+                 homepage, so both the targets and the anchor wording are load-bearing. --}}
             <div class="foot-col">
-                <h4>Product</h4>
-                <a href="{{ route('home') }}">Classic homepage</a>
+                <h4>Quick Links</h4>
+                <a href="{{ route('home') }}">Home</a>
                 <a href="{{ route('subscription.pricing') }}">Pricing</a>
                 @auth <a href="{{ route('subscription.manage') }}">Dashboard</a>
-                @else <a href="{{ route('auth.google') }}">Sign in</a> @endauth
+                @else <a href="{{ route('auth.google') }}">Sign In</a> @endauth
             </div>
 
             <div class="foot-col">
-                <h4>Guides</h4>
+                <h4>WeTransfer Guides</h4>
+                <a href="{{ route('seo.pricing') }}">WeTransfer Pricing</a>
+                <a href="{{ route('seo.send-files') }}">How to Send Files</a>
+                <a href="{{ route('seo.upload') }}">Upload Tutorial</a>
+                <a href="{{ route('seo.free') }}">Free Plan Guide</a>
+                <a href="{{ route('seo.alternative') }}">WeTransfer Alternative</a>
                 <a href="{{ route('seo.google-drive-guide') }}">Save to Google Drive</a>
-                <a href="{{ route('seo.send-files') }}">How to send files</a>
-                <a href="{{ route('seo.alternative') }}">WeTransfer alternative</a>
-                <a href="{{ route('seo.free') }}">Free plan guide</a>
             </div>
 
             <div class="foot-col">
                 <h4>Support</h4>
-                <a href="{{ route('support.help') }}">Help centre</a>
-                <a href="{{ route('support.contact') }}">Contact us</a>
-                <a href="{{ route('support.privacy') }}">Privacy policy</a>
-                <a href="{{ route('support.terms') }}">Terms of service</a>
+                <a href="{{ route('support.help') }}">Help Center</a>
+                <a href="{{ route('support.contact') }}">Contact Us</a>
+                <a href="{{ route('support.privacy') }}">Privacy Policy</a>
+                <a href="{{ route('support.terms') }}">Terms of Service</a>
             </div>
         </div>
 
@@ -915,12 +972,13 @@
             const el = e.target;
             const target = +el.dataset.count;
             const suffix = el.dataset.suffix || '';
-            if (reduced) { el.textContent = target.toLocaleString() + suffix; return; }
+            const prefix = el.dataset.prefix || '';
+            if (reduced) { el.textContent = prefix + target.toLocaleString() + suffix; return; }
             const dur = 1400, t0 = performance.now();
             const tick = (now) => {
                 const p = Math.min((now - t0) / dur, 1);
                 const eased = 1 - Math.pow(1 - p, 3);
-                el.textContent = Math.round(target * eased).toLocaleString() + suffix;
+                el.textContent = prefix + Math.round(target * eased).toLocaleString() + suffix;
                 if (p < 1) requestAnimationFrame(tick);
             };
             requestAnimationFrame(tick);
