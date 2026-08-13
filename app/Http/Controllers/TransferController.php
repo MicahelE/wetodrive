@@ -14,6 +14,7 @@ use GuzzleHttp\Cookie\CookieJar;
 use App\Mail\OversizeTransferAlertMail;
 use App\Mail\TransferCompleteMail;
 use App\Mail\TransferFailedMail;
+use App\Mail\UpgradeNudgeMail;
 use App\Services\StreamTransferService;
 use App\Services\ResumableDownloader;
 use App\Http\Controllers\StreamProgressController;
@@ -171,6 +172,7 @@ class TransferController extends Controller
                 ]);
 
                 $this->alertAdminsIfUnservable($user, $fileInfo);
+                $this->nudgeUserToUpgrade($user, $fileInfo, $maxSize);
 
                 $payload = $this->limitErrorPayload($user, $fileInfo, $maxSize);
 
@@ -668,6 +670,7 @@ class TransferController extends Controller
                 ]);
 
                 $this->alertAdminsIfUnservable($user, $fileInfo);
+                $this->nudgeUserToUpgrade($user, $fileInfo, $maxSize);
 
                 $payload = $this->limitErrorPayload($user, $fileInfo, $maxSize);
 
@@ -1298,6 +1301,45 @@ class TransferController extends Controller
         } catch (\Throwable $e) {
             // An alert must never break the user's request.
             Log::warning('Failed to send oversize transfer alert', [
+                'user_id' => $user->id ?? null,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Email a free user who just bounced off the size limit, nudging them to the
+     * plan that would carry the file. Only fires when an upgrade actually helps
+     * (the file fits some plan), the user hasn't opted out of marketing, and we
+     * haven't already nudged them recently. Mirrors alertAdminsIfUnservable: a
+     * nudge must never break the user's request.
+     */
+    private function nudgeUserToUpgrade($user, array $fileInfo, int $maxSize): void
+    {
+        try {
+            if (($user->email_opt_out ?? false) || ($user->role ?? null) === 'admin') {
+                return;
+            }
+
+            $plan = $this->recommendPlanFor($fileInfo['size']);
+            if (! $plan) {
+                return; // bigger than every plan — nothing to upsell (admin alert covers this)
+            }
+
+            // ponytail: shared cooldown with the batch backlog send, so retries
+            // and a re-run of emails:upgrade-nudge can't stack copies on someone.
+            if (! Cache::add("upgrade-nudge:{$user->id}", true, now()->addDays(7))) {
+                return;
+            }
+
+            Mail::to($user)->send(new UpgradeNudgeMail(
+                $user,
+                $this->formatFileSize($fileInfo['size']),
+                $plan->name,
+                $plan->getFormattedPriceForCountry($user->country_code ?? 'US'),
+            ));
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send upgrade nudge email', [
                 'user_id' => $user->id ?? null,
                 'error' => $e->getMessage(),
             ]);
