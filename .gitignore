@@ -28,3 +28,6 @@ CLAUDE.md
 PRD.md
 .curlrc
 site-map.xml
+
+# Playwright MCP screenshot output
+/.playwright-mcp

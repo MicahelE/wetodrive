@@ -30,6 +30,23 @@ class TransferController extends Controller
         return view('home');
     }
 
+    /**
+     * Experimental redesign of the homepage, served at /v2 so the live homepage
+     * stays untouched while we get a feel for it. Promote it by pointing the
+     * 'home' route here once we're happy.
+     */
+    public function indexV2()
+    {
+        // Real numbers, not marketing fiction — the trust section prints these.
+        $stats = Cache::remember('home-v2-stats', now()->addMinutes(10), fn () => [
+            'users' => User::count(),
+            'transfers' => Transfer::count(),
+            'bytes' => (int) Transfer::sum('file_size'),
+        ]);
+
+        return view('home-v2', compact('stats'));
+    }
+
     public function transfer(Request $request)
     {
         set_time_limit(0); // No time limit for streaming large files

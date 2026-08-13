@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="WetoDrive">
+  <defs>
+    <linearGradient id="wtd-badge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="wtd-tri" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#DBEAFE"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Badge -->
+  <rect width="64" height="64" rx="16" fill="url(#wtd-badge)"/>
+
+  <!-- Motion chevrons: the transfer arriving, in Drive's palette -->
+  <g fill="none" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 25.5 L12.5 32 L6 38.5"  stroke="#FBBC04" opacity=".55"/>
+    <path d="M15 25.5 L21.5 32 L15 38.5" stroke="#34A853" opacity=".8"/>
+  </g>
+
+  <!-- The Drive: a triangle with a storage slot cut through it -->
+  <path d="M43 15.5 L60 47 a2.6 2.6 0 0 1-2.3 3.6 H28.3 a2.6 2.6 0 0 1-2.3-3.6 Z" fill="url(#wtd-tri)"/>
+  <rect x="33" y="40.5" width="19" height="3.4" rx="1.7" fill="#2563EB" opacity=".45"/>
+</svg>
