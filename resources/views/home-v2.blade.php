@@ -455,7 +455,7 @@
 <nav class="nav" id="nav">
     <div class="wrap nav-in">
         <a href="{{ route('home.v2') }}" class="brand">
-            @include('partials.logo-mark', ['size' => 36, 'animated' => true])
+            @include('partials.logo-mark', ['size' => 36])
             <span class="brand-name">Weto<span>Drive</span></span>
         </a>
 
