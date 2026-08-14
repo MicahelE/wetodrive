@@ -675,7 +675,9 @@
                                     @php $subscription = Auth::user()->activeSubscription; @endphp
                                     {{ $subscription->getRemainingTransfers() === null ? '∞' : $subscription->getRemainingTransfers() }}
                                 @else
-                                    {{ 5 - Auth::user()->total_transfers }}
+                                    {{-- max(0, ...): a free user past 5 transfers was shown a
+                                         negative count. getRemainingTransfers() already clamps. --}}
+                                    {{ max(0, 5 - Auth::user()->total_transfers) }}
                                 @endif
                             </div>
                             <div style="opacity: 0.8; font-size: 0.9rem;">Transfers Remaining</div>
