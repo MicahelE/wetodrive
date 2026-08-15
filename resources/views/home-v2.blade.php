@@ -161,7 +161,7 @@
             padding: 0 26px; font-size: .96rem; font-weight: 600; color: var(--ink);
             white-space: nowrap;
         }
-        .marquee-item svg { color: var(--blue); flex-shrink: 0; }
+        .marquee-item svg { flex-shrink: 0; }
 
         /* ============ Motion, used sparingly ============ */
         .rise { opacity: 0; transform: translateY(16px); transition: opacity .55s ease, transform .55s ease; }
@@ -207,10 +207,17 @@
             background: var(--white); border: 1px solid var(--line); border-radius: var(--r);
             padding: 24px; box-shadow: var(--shadow);
         }
+        /* Icons are full colour rather than a single blue line weight: the flat
+           monochrome set read as dry next to the emoji on the old homepage. */
         .card .ico {
-            width: 40px; height: 40px; border-radius: var(--r-sm); background: var(--blue-soft);
-            display: grid; place-items: center; margin-bottom: 14px; color: var(--blue);
+            width: 52px; height: 52px; border-radius: 12px;
+            display: grid; place-items: center; margin-bottom: 15px;
+            transition: transform .25s ease;
         }
+        .card:hover .ico { transform: scale(1.06) rotate(-3deg); }
+        .ico-amber { background: linear-gradient(145deg, #FFF4D6, #FFE7A8); }
+        .ico-green { background: linear-gradient(145deg, #DFF6E6, #BEEBCC); }
+        .ico-blue  { background: linear-gradient(145deg, #E0E8FF, #C4D3FF); }
         .card h3 { font-size: 1.02rem; font-weight: 650; margin-bottom: 7px; }
         .card p { font-size: .93rem; color: var(--muted); }
 
@@ -504,23 +511,23 @@
      reading the whole thing twice. --}}
 @php
     $audiences = [
-        ['Videographers', 'M23 7l-7 5 7 5V7z M14 5H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z'],
-        ['Motion designers', 'M12 2v20 M2 12h20'],
-        ['Photo studios', 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z'],
-        ['Creative agencies', 'M3 21h18 M5 21V7l8-4v18 M19 21V11l-6-4'],
-        ['Post-production', 'M9 18V5l12-2v13 M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
-        ['VFX artists', 'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z'],
-        ['Wedding filmmakers', 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 1 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8z'],
-        ['Architects', 'M3 21h18 M9 8h1 M9 12h1 M9 16h1 M14 8h1 M14 12h1 M14 16h1 M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17'],
-        ['Music producers', 'M9 18V5l12-2v13 M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M18 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
-        ['Broadcast teams', 'M4 11a9 9 0 0 1 9 9 M4 4a16 16 0 0 1 16 16 M5 19a1 1 0 1 0 0 2 1 1 0 0 0 0-2z'],
+        ['Videographers', 'M23 7l-7 5 7 5V7z M14 5H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z', '#4285F4'],
+        ['Motion designers', 'M12 2v20 M2 12h20', '#EA4335'],
+        ['Photo studios', 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z', '#FBBC04'],
+        ['Creative agencies', 'M3 21h18 M5 21V7l8-4v18 M19 21V11l-6-4', '#34A853'],
+        ['Post-production', 'M9 18V5l12-2v13 M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', '#7C4DFF'],
+        ['VFX artists', 'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z', '#FBBC04'],
+        ['Wedding filmmakers', 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 1 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8z', '#EA4335'],
+        ['Architects', 'M3 21h18 M9 8h1 M9 12h1 M9 16h1 M14 8h1 M14 12h1 M14 16h1 M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17', '#00ACC1'],
+        ['Music producers', 'M9 18V5l12-2v13 M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M18 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', '#7C4DFF'],
+        ['Broadcast teams', 'M4 11a9 9 0 0 1 9 9 M4 4a16 16 0 0 1 16 16 M5 19a1 1 0 1 0 0 2 1 1 0 0 0 0-2z', '#34A853'],
     ];
 @endphp
 <div class="marquee">
     <div class="marquee-track">
         @foreach (array_merge($audiences, $audiences) as $i => $a)
             <span class="marquee-item" @if($i >= count($audiences)) aria-hidden="true" @endif>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ $a[1] }}"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{ $a[2] }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ $a[1] }}"/></svg>
                 {{ $a[0] }}
             </span>
         @endforeach
@@ -531,17 +538,51 @@
 <div class="wrap">
     <div class="cards">
         <div class="card">
-            <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+            <div class="ico ico-amber">
+                {{-- Bolt striking through a moving file: amber for speed, blue for the file. --}}
+                <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+                    <rect x="4" y="6" width="17" height="21" rx="3" fill="#4285F4"/>
+                    <rect x="4" y="6" width="17" height="21" rx="3" fill="url(#gA)" opacity=".55"/>
+                    <path d="M8 13h8M8 17h6" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".85"/>
+                    <path d="M22 3 14 16h5l-2 12 9-14h-5l1-11z" fill="#FBBC04" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>
+                    <defs><linearGradient id="gA" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#7BA5FF"/><stop offset="100%" stop-color="#2A42F7"/>
+                    </linearGradient></defs>
+                </svg>
+            </div>
             <h3>Instant Transfer</h3>
             <p>No more manual downloading and uploading. Transfer files directly from WeTransfer to Google Drive.</p>
         </div>
         <div class="card">
-            <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v6h10V3M7 21v-6h10v6"/></svg></div>
+            <div class="ico ico-green">
+                {{-- A drive with the bay empty and a green tick: nothing stored on your machine. --}}
+                <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+                    <rect x="3" y="7" width="26" height="18" rx="4" fill="#34A853"/>
+                    <rect x="3" y="7" width="26" height="18" rx="4" fill="url(#gB)" opacity=".5"/>
+                    <rect x="7" y="18" width="18" height="3.4" rx="1.7" fill="#fff" opacity=".9"/>
+                    <circle cx="24" cy="12.5" r="2" fill="#FBBC04"/>
+                    <path d="M9 12.5h9" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".8"/>
+                    <defs><linearGradient id="gB" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#7BE0A0"/><stop offset="100%" stop-color="#1E7E38"/>
+                    </linearGradient></defs>
+                </svg>
+            </div>
             <h3>Save Storage</h3>
             <p>Files stream directly to your Google Drive without taking up space on your device.</p>
         </div>
         <div class="card">
-            <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="ico ico-blue">
+                {{-- Shield in Drive's blue with a green tick locked into it. --}}
+                <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+                    <path d="M16 2.5 27 6.5v9c0 8-5.4 12.6-11 14.4C10.4 28.1 5 23.5 5 15.5v-9z" fill="#4285F4"/>
+                    <path d="M16 2.5 27 6.5v9c0 8-5.4 12.6-11 14.4C10.4 28.1 5 23.5 5 15.5v-9z" fill="url(#gC)" opacity=".55"/>
+                    <path d="M11 16.2l3.4 3.4L21.2 12" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M16 2.5 27 6.5v9c0 8-5.4 12.6-11 14.4z" fill="#EA4335" opacity=".14"/>
+                    <defs><linearGradient id="gC" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#8FB4FF"/><stop offset="100%" stop-color="#1A2D99"/>
+                    </linearGradient></defs>
+                </svg>
+            </div>
             <h3>Fast &amp; Secure</h3>
             <p>Powered by Google's secure infrastructure with enterprise-grade encryption.</p>
         </div>
