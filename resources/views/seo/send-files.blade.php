@@ -61,7 +61,7 @@
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
-            <a href="{{ route('home') }}" class="logo">📦 WetoDrive</a>
+            <a href="{{ route('home') }}" class="logo">@include('partials.logo-inline') WetoDrive</a>
             <div class="nav-links">
                 <a href="{{ route('home') }}">Home</a>
                 <a href="{{ route('seo.pricing') }}">Pricing</a>
@@ -225,7 +225,7 @@
     <footer class="footer">
         <div class="footer-content">
             <div class="footer-section">
-                <h4>📦 WetoDrive</h4>
+                <h4>@include('partials.logo-inline') WetoDrive</h4>
                 <p style="font-size: 0.9rem;">
                     Transfer files from WeTransfer to Google Drive instantly. No downloads, no storage limits on your device.
                 </p>

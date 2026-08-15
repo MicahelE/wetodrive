@@ -26,8 +26,13 @@
     <meta name="twitter:title" content="WetoDrive - WeTransfer to Google Drive">
     <meta name="twitter:description" content="Transfer files from WeTransfer to Google Drive instantly. No downloading and uploading, no storage used on your device.">
 
-    <link rel="icon" type="image/svg+xml" href="{{ asset('logo-mark.svg') }}">
-    <link rel="apple-touch-icon" href="{{ asset('logo-mark.svg') }}">
+    {{-- favicon.svg is the single source of truth for the mark: every other view
+         already points at it, so the logo only has to change in one place.
+         favicon.ico carries the same artwork because browsers request
+         /favicon.ico whether or not it is linked. --}}
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ asset('favicon.svg') }}">
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <meta name="theme-color" content="#2A42F7">
 

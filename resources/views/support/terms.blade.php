@@ -233,7 +233,7 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="{{ route('home') }}" class="logo">
-                📦 WetoDrive
+                @include('partials.logo-inline') WetoDrive
             </a>
 
             <div class="nav-links">
@@ -468,7 +468,7 @@
     <footer class="footer">
         <div class="footer-content">
             <div class="footer-section">
-                <h4>📦 WetoDrive</h4>
+                <h4>@include('partials.logo-inline') WetoDrive</h4>
                 <a href="{{ route('home') }}">Home</a>
                 <a href="{{ route('subscription.pricing') }}">Pricing</a>
                 @auth

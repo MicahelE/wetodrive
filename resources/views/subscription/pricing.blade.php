@@ -9,7 +9,7 @@
     <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
     <link rel="apple-touch-icon" href="{{ asset('favicon.svg') }}">
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
-    <meta name="theme-color" content="#4285f4">
+    <meta name="theme-color" content="#2A42F7">
     
     <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-174D73GPWB"></script>
@@ -465,7 +465,7 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="{{ route('home') }}" class="logo">
-                📦 WetoDrive
+                @include('partials.logo-inline') WetoDrive
             </a>
 
             <div class="nav-links">
@@ -528,7 +528,7 @@
         <div class="container">
 
         <div class="header">
-            <h1>📦 Choose Your Plan</h1>
+            <h1>Choose Your Plan</h1>
             <p>Transfer files from WeTransfer to Google Drive with our flexible plans</p>
         </div>
 
@@ -689,7 +689,7 @@
     <footer class="footer">
         <div class="footer-content">
             <div class="footer-section">
-                <h4>📦 WetoDrive</h4>
+                <h4>@include('partials.logo-inline') WetoDrive</h4>
                 <p style="font-size: 0.9rem;">
                     Transfer files from WeTransfer to Google Drive instantly. No downloads, no storage limits on your device.
                 </p>
