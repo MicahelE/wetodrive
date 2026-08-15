@@ -173,27 +173,31 @@ class StreamTransferService
     }
 
     /**
-     * Split a WeTransfer download URL into [transfer_id, security_hash].
+     * Split a WeTransfer download URL into [transfer_id, security_hash, recipient_id].
      *
      * There are two link shapes and only one was handled. The sender's own page
-     * gives /downloads/{id}/{hash}; the "you received files" email gives
-     * /downloads/{id}/{recipient_id}/{hash}. Taking the second segment blindly
-     * sent the recipient id to the API as the security hash, which answers 403.
-     * That surfaced as WETRANSFER_EXPIRED, so it read as an expired link rather
-     * than our bug, and it broke every transfer started from a WeTransfer email
-     * between 2026-08-07 and 2026-08-15. The hash is always the LAST segment.
+     * gives /downloads/{id}/{hash}. The "you received files" email, which is how
+     * most people arrive, gives /downloads/{id}/{recipient_id}/{hash} — and that
+     * download is scoped to the recipient, so the API needs BOTH the hash (last
+     * segment) and the recipient id (middle segment). We were sending the
+     * recipient id as the hash and nothing else, so WeTransfer answered 403 on
+     * every email link. Sending both returns 200 on the very same URLs.
+     *
+     * recipient_id is null for sender-page links, which have no recipient.
      */
     public static function parseDownloadUrl(string $pageUrl): array
     {
-        // The optional group absorbs the recipient id when it is there, and the
-        // regex backtracks out of it on two-segment links.
-        $pattern = '#wetransfer\.com/downloads/([a-f0-9]+)(?:/[a-f0-9]+)?/([a-f0-9]+)#';
-
-        if (! preg_match($pattern, $pageUrl, $matches)) {
-            throw new \Exception('Invalid WeTransfer URL format');
+        // Three segments: the middle one is the recipient id.
+        if (preg_match('#wetransfer\.com/downloads/([a-f0-9]+)/([a-f0-9]+)/([a-f0-9]+)#', $pageUrl, $m)) {
+            return [$m[1], $m[3], $m[2]];
         }
 
-        return [$matches[1], $matches[2]];
+        // Two segments: hash only.
+        if (preg_match('#wetransfer\.com/downloads/([a-f0-9]+)/([a-f0-9]+)#', $pageUrl, $m)) {
+            return [$m[1], $m[2], null];
+        }
+
+        throw new \Exception('Invalid WeTransfer URL format');
     }
 
     /**
@@ -203,7 +207,7 @@ class StreamTransferService
     {
         Log::info('Getting direct download link', ['page_url' => $pageUrl]);
 
-        [$transferId, $securityHash] = self::parseDownloadUrl($pageUrl);
+        [$transferId, $securityHash, $recipientId] = self::parseDownloadUrl($pageUrl);
 
         $cookieJar = new CookieJar();
 
@@ -245,6 +249,11 @@ class StreamTransferService
             'security_hash' => $securityHash,
             'intent' => 'entire_transfer'
         ];
+
+        // Recipient-scoped links 403 without this.
+        if ($recipientId) {
+            $requestBody['recipient_id'] = $recipientId;
+        }
 
         if ($csrfToken) {
             $requestBody['csrf_token'] = $csrfToken;

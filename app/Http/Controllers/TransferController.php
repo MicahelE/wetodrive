@@ -816,7 +816,7 @@ class TransferController extends Controller
         // Shapes: /downloads/{transfer_id}/{security_hash} from the sender page,
         // /downloads/{transfer_id}/{recipient_id}/{security_hash} from the email.
         try {
-            [$transferId, $securityHash] = StreamTransferService::parseDownloadUrl($pageUrl);
+            [$transferId, $securityHash, $recipientId] = StreamTransferService::parseDownloadUrl($pageUrl);
         } catch (\Exception $e) {
             Log::error('Could not extract transfer ID from URL', ['url' => $pageUrl]);
             throw $e;
@@ -903,7 +903,12 @@ class TransferController extends Controller
                 'security_hash' => $securityHash,
                 'intent' => 'entire_transfer'
             ];
-            
+
+            // Recipient-scoped links 403 without this.
+            if ($recipientId) {
+                $requestBody['recipient_id'] = $recipientId;
+            }
+
             if ($csrfToken) {
                 $requestBody['csrf_token'] = $csrfToken;
             }
