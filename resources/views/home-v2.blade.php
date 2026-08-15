@@ -167,12 +167,21 @@
         }
         @keyframes fill { 0% { width: 0; } 78% { width: 100%; } 100% { width: 100%; } }
         .demo-foot { display: flex; justify-content: space-between; margin-top: 10px; font-size: .8rem; color: var(--muted); }
-        .demo-done {
-            display: flex; align-items: center; gap: 8px; margin-top: 13px; padding-top: 12px;
-            border-top: 1px solid var(--line); font-size: .85rem; color: #1E7E38; font-weight: 600;
-            opacity: 0; animation: showDone 7s linear infinite;
+        /* Both status lines share one fixed-height slot and cross-fade. Reserving
+           the row avoids layout shift; keeping something in it at all times avoids
+           the dead gap the panel had while "Saved" was still invisible. */
+        .demo-status {
+            position: relative; height: 21px; margin-top: 13px; padding-top: 12px;
+            border-top: 1px solid var(--line);
         }
-        @keyframes showDone { 0%, 76% { opacity: 0; } 84%, 100% { opacity: 1; } }
+        .demo-status > span {
+            position: absolute; left: 0; right: 0; bottom: 0;
+            display: flex; align-items: center; gap: 8px; font-size: .85rem; font-weight: 600;
+        }
+        .demo-streaming { color: var(--muted); animation: swapOut 7s linear infinite; }
+        .demo-saved { color: #1E7E38; opacity: 0; animation: swapIn 7s linear infinite; }
+        @keyframes swapOut { 0%, 74% { opacity: 1; } 80%, 100% { opacity: 0; } }
+        @keyframes swapIn  { 0%, 74% { opacity: 0; } 80%, 100% { opacity: 1; } }
 
         /* ============ Audience marquee ============ */
         /* CSS-only infinite scroll: the track holds the list twice and slides by
@@ -553,9 +562,15 @@
                     <span>48.2 GB</span>
                     <span>streaming to Drive</span>
                 </div>
-                <div class="demo-done">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1E7E38" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-                    Saved to your Google Drive
+                <div class="demo-status">
+                    <span class="demo-streaming">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v6M12 16v6M2 12h6M16 12h6"/></svg>
+                        Nothing stored on your device
+                    </span>
+                    <span class="demo-saved">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1E7E38" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        Saved to your Google Drive
+                    </span>
                 </div>
             </div>
         @endauth
