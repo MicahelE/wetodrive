@@ -137,6 +137,8 @@ class StreamTransferService
             return $this->resolveShortUrl($url);
         }
 
+        $url = self::normalizeDownloadUrl($url);
+
         // Handle full URLs - need to get direct download link
         if (strpos($url, 'wetransfer.com/downloads') !== false) {
             return $this->getDirectDownloadLink($url);
@@ -170,6 +172,20 @@ class StreamTransferService
 
         // Now get the direct download link from the resolved URL
         return $this->getDirectDownloadLink($locationHeader);
+    }
+
+    /**
+     * Point a /previews/ URL at /downloads/ instead.
+     *
+     * WeTransfer serves the same transfer under both paths with identical ids,
+     * and people paste whichever one their browser happens to be showing. We
+     * only ever accepted /downloads/, so a preview link was rejected outright
+     * as "Invalid WeTransfer URL format" — 93 times in the logs. Anything that
+     * is not a preview URL comes back untouched.
+     */
+    public static function normalizeDownloadUrl(string $url): string
+    {
+        return preg_replace('#(wetransfer\.com)/previews/#', '$1/downloads/', $url, 1);
     }
 
     /**

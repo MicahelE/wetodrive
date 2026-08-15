@@ -977,6 +977,8 @@ class TransferController extends Controller
     {
         Log::info('Starting file download', ['url' => $url]);
 
+        $url = StreamTransferService::normalizeDownloadUrl($url);
+
         // If this is a WeTransfer page URL, get the direct download link first
         if (strpos($url, 'wetransfer.com/downloads') !== false) {
             $url = $this->getDirectDownloadLink($url);

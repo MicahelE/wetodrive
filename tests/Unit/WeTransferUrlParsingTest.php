@@ -62,4 +62,42 @@ class WeTransferUrlParsingTest extends TestCase
         $this->expectException(\Exception::class);
         StreamTransferService::parseDownloadUrl('https://wetransfer.com/');
     }
+
+    /**
+     * Preview links were rejected outright even though they carry the same ids.
+     * These two are the same transfer, from the 2026-05-22 logs, where the user
+     * was bounced on the preview URL and retyped it as a download URL by hand.
+     */
+    public function test_it_points_a_preview_link_at_the_download_path(): void
+    {
+        $this->assertSame(
+            'https://wetransfer.com/downloads/25869f2d9e5282c802524da99d4b75a020260516032144'
+            .'/b29f19948c4dfb00d18cb940aaa66b4120260516060432/295b8a',
+            StreamTransferService::normalizeDownloadUrl(
+                'https://wetransfer.com/previews/25869f2d9e5282c802524da99d4b75a020260516032144'
+                .'/b29f19948c4dfb00d18cb940aaa66b4120260516060432/295b8a'
+            )
+        );
+    }
+
+    public function test_it_normalises_previews_on_a_custom_subdomain(): void
+    {
+        $this->assertSame(
+            'https://joejones.wetransfer.com/downloads/ec8e992d15091b9546f6c847c729530220260106203843/9fb6ef',
+            StreamTransferService::normalizeDownloadUrl(
+                'https://joejones.wetransfer.com/previews/ec8e992d15091b9546f6c847c729530220260106203843/9fb6ef'
+            )
+        );
+    }
+
+    public function test_it_leaves_everything_else_alone(): void
+    {
+        foreach ([
+            'https://wetransfer.com/downloads/aaaa1111/bbbb22',
+            'https://we.tl/t-SDzfcygzfirDLer1',
+            'https://example.com/previews/whatever',
+        ] as $url) {
+            $this->assertSame($url, StreamTransferService::normalizeDownloadUrl($url));
+        }
+    }
 }
