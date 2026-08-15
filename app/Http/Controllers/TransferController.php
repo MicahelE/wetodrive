@@ -25,17 +25,12 @@ use Illuminate\Support\Facades\Mail;
 
 class TransferController extends Controller
 {
-    public function index()
-    {
-        return view('home');
-    }
-
     /**
-     * Experimental redesign of the homepage, served at /v2 so the live homepage
-     * stays untouched while we get a feel for it. Promote it by pointing the
-     * 'home' route here once we're happy.
+     * The homepage. The previous design is preserved verbatim at
+     * resources/views/home-legacy.blade.php: to roll back, return that view
+     * instead and drop the $stats argument.
      */
-    public function indexV2()
+    public function index()
     {
         // Live figures from this database. On production that is production data;
         // locally it is a near-empty dev db, which is why the view hides these
@@ -45,13 +40,22 @@ class TransferController extends Controller
         // stay consistent with each other. Note users.total_transfers sums higher
         // (144 vs 130 rows in prod as of 2026-08-13), so both figures here are a
         // conservative floor. The view says "over" for that reason.
-        $stats = Cache::remember('home-v2-stats', now()->addMinutes(10), fn () => [
-            'accounts' => User::count(),
-            'transfers' => Transfer::count(),
-            'bytes' => (int) Transfer::sum('file_size'),
-        ]);
+        // The stats are decorative, but this page was a static view before the
+        // redesign and now touches the database. A db hiccup must not take down
+        // the page carrying most of the site's search traffic, so failure just
+        // hides the section (the view already skips it when transfers is 0).
+        try {
+            $stats = Cache::remember('home-stats', now()->addMinutes(10), fn () => [
+                'accounts' => User::count(),
+                'transfers' => Transfer::count(),
+                'bytes' => (int) Transfer::sum('file_size'),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Homepage stats unavailable, rendering without them', ['error' => $e->getMessage()]);
+            $stats = ['accounts' => 0, 'transfers' => 0, 'bytes' => 0];
+        }
 
-        return view('home-v2', compact('stats'));
+        return view('home', compact('stats'));
     }
 
     public function transfer(Request $request)

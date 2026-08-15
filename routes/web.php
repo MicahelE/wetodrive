@@ -12,8 +12,10 @@ use App\Http\Controllers\UnsubscribeController;
 
 Route::get('/', [TransferController::class, 'index'])->name('home');
 
-// Homepage redesign, live alongside the current one until we decide to promote it.
-Route::get('/v2', [TransferController::class, 'indexV2'])->name('home.v2');
+// The redesign was staged here before promotion. Permanent redirect rather than
+// a 404 so anyone holding the link still lands somewhere, and so the two pages
+// can never compete for the same keywords.
+Route::permanentRedirect('/v2', '/');
 
 // Marketing unsubscribe. Signed URL, no auth — the link lives in the email itself.
 Route::get('/unsubscribe/{user}', [UnsubscribeController::class, 'unsubscribe'])
