@@ -394,6 +394,39 @@
         .menu-panel a { display: block; padding: 13px 0; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--line); font-weight: 500; }
         .menu-panel a:last-child { border-bottom: 0; }
 
+        /* ============ Account menu ============ */
+        /* The redesign dropped the Disconnect button and the Admin link that the
+           live homepage carries, which left a signed-in user with no way to sign
+           out. Native <details> again, so it needs no JS. */
+        .acct { position: relative; }
+        .acct > summary {
+            list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px 6px 6px; border-radius: var(--r-full); border: 1px solid var(--line);
+            min-height: 44px; font-size: .92rem; font-weight: 600;
+        }
+        .acct > summary::-webkit-details-marker { display: none; }
+        .acct[open] > summary { background: var(--blue-soft); border-color: #D9E0FF; }
+        .acct-avatar {
+            width: 28px; height: 28px; border-radius: var(--r-full); flex-shrink: 0;
+            background: var(--blue); color: #fff; display: grid; place-items: center;
+            font-size: .82rem; font-weight: 700;
+        }
+        .acct-panel {
+            position: absolute; right: 0; top: calc(100% + 8px); min-width: 232px;
+            background: var(--white); border: 1px solid var(--line); border-radius: var(--r);
+            box-shadow: var(--shadow-lg); padding: 6px; z-index: 60;
+        }
+        .acct-who { padding: 10px 12px 12px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+        .acct-who b { display: block; font-size: .92rem; }
+        .acct-who span { color: var(--muted); font-size: .82rem; word-break: break-all; }
+        .acct-panel a, .acct-panel button {
+            display: block; width: 100%; text-align: left; padding: 11px 12px; border-radius: var(--r-sm);
+            text-decoration: none; color: var(--ink); font-size: .92rem; font-family: inherit;
+            background: none; border: 0; cursor: pointer; font-weight: 500;
+        }
+        .acct-panel a:hover, .acct-panel button:hover { background: var(--page); }
+        .acct-panel button { color: #B3261E; }
+
         @media (max-width: 860px) {
             .cards, .steps, .perms { grid-template-columns: 1fr; }
             .cards { margin-top: 30px; }
@@ -445,7 +478,30 @@
 
         <div style="display:flex; align-items:center; gap:10px;">
             @auth
-                <a href="{{ route('subscription.manage') }}" class="btn btn-outline">Dashboard</a>
+                <details class="acct">
+                    <summary>
+                        <span class="acct-avatar">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</span>
+                        {{ Str::of(Auth::user()->name)->explode(' ')->first() }}
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </summary>
+                    <div class="acct-panel">
+                        {{-- The email matters: it is the only way to tell which Google
+                             account you are signed in as when you have more than one. --}}
+                        <div class="acct-who">
+                            <b>{{ Auth::user()->name }}</b>
+                            <span>{{ Auth::user()->email }}</span>
+                        </div>
+                        <a href="{{ route('subscription.manage') }}">Dashboard</a>
+                        <a href="{{ route('subscription.pricing') }}">Plans and billing</a>
+                        @if(Auth::user()->role === 'admin')
+                            <a href="{{ route('admin.dashboard') }}">Admin</a>
+                        @endif
+                        <form method="POST" action="{{ route('auth.disconnect') }}">
+                            @csrf
+                            <button type="submit">Disconnect Google Drive</button>
+                        </form>
+                    </div>
+                </details>
             @else
                 <a href="{{ route('auth.google') }}" class="btn btn-primary" data-cta="nav">Sign In</a>
             @endauth

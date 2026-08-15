@@ -136,6 +136,34 @@ class HomepageV2Test extends TestCase
         }
     }
 
+    /**
+     * The redesign initially dropped these, leaving a signed-in user with no way
+     * to sign out and an admin with no way into the dashboard. Whatever the
+     * homepage offers a logged-in user, this page has to offer too.
+     */
+    public function test_a_signed_in_user_can_still_reach_their_account_controls(): void
+    {
+        $r = $this->actingAs(User::factory()->create(['role' => 'user']))->get('/v2')->assertOk();
+
+        $r->assertSee('auth/disconnect', false);        // can sign out
+        $r->assertSee('subscription/manage', false);    // can reach the dashboard
+        $r->assertSee('pricing', false);                // can reach billing
+    }
+
+    public function test_an_admin_sees_the_admin_link(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'admin']))
+            ->get('/v2')->assertOk()
+            ->assertSee('admin/dashboard', false);
+    }
+
+    public function test_a_non_admin_does_not_see_the_admin_link(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'user']))
+            ->get('/v2')->assertOk()
+            ->assertDontSee('admin/dashboard', false);
+    }
+
     public function test_stats_are_hidden_rather_than_showing_zero(): void
     {
         // An empty db must not advertise "0 transfers".
