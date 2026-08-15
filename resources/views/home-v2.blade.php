@@ -48,6 +48,8 @@
     }
     </script>
 
+    @vite(['resources/js/hero.js'])
+
     <style>
         /* ==========================================================
            Design tokens. Three radii and three surfaces, deliberately.
@@ -129,9 +131,43 @@
 
         /* ============ Hero ============ */
         .hero {
+            position: relative; isolation: isolate;
             background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
             color: #fff; padding: 68px 0 104px; text-align: center;
+            overflow: hidden;
         }
+        /* The three.js stream sits behind the copy. The gradient above is the
+           fallback, so the hero is complete before (and without) WebGL. */
+        #heroCanvas {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+            z-index: -1; display: block; pointer-events: none;
+        }
+        .hero > .wrap { position: relative; z-index: 1; }
+
+        /* ============ Audience marquee ============ */
+        /* CSS-only infinite scroll: the track holds the list twice and slides by
+           exactly half, so the seam is invisible and it needs no JS. */
+        .marquee {
+            background: var(--white); border-block: 1px solid var(--line);
+            padding: 16px 0; overflow: hidden;
+            -webkit-mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
+        }
+        .marquee-track { display: flex; width: max-content; animation: slide 46s linear infinite; }
+        .marquee:hover .marquee-track { animation-play-state: paused; }
+        @keyframes slide { to { transform: translateX(-50%); } }
+        .marquee-item {
+            display: inline-flex; align-items: center; gap: 9px;
+            padding: 0 26px; font-size: .96rem; font-weight: 600; color: var(--ink);
+            white-space: nowrap;
+        }
+        .marquee-item svg { color: var(--blue); flex-shrink: 0; }
+
+        /* ============ Motion, used sparingly ============ */
+        .rise { opacity: 0; transform: translateY(16px); transition: opacity .55s ease, transform .55s ease; }
+        .rise.in { opacity: 1; transform: none; }
+        .card, .quote { transition: transform .22s ease, box-shadow .22s ease; }
+        .card:hover, .quote:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
         .hero h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; margin-bottom: 14px; }
         .hero .tagline { font-size: clamp(1.02rem, 2.2vw, 1.2rem); opacity: .9; max-width: 620px; margin: 0 auto 30px; }
         .hero .fineprint { margin-top: 16px; font-size: .87rem; opacity: .82; display: flex; align-items: center; justify-content: center; gap: 7px; flex-wrap: wrap; }
@@ -166,7 +202,7 @@
         .hint.bad { color: #C0392B; }
 
         /* ============ Cards overlapping the hero ============ */
-        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: -64px; }
+        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 44px; }
         .card {
             background: var(--white); border: 1px solid var(--line); border-radius: var(--r);
             padding: 24px; box-shadow: var(--shadow);
@@ -286,7 +322,7 @@
 
         @media (max-width: 860px) {
             .cards, .steps, .perms { grid-template-columns: 1fr; }
-            .cards { margin-top: -48px; }
+            .cards { margin-top: 30px; }
             .foot { grid-template-columns: 1fr 1fr; }
             .nav-links { display: none; }
             .menu { display: block; }
@@ -302,6 +338,9 @@
         /* ============ Accessibility ============ */
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+            /* Anything that animates in must still be readable when motion is off. */
+            .rise { opacity: 1 !important; transform: none !important; }
+            .marquee-track { animation: none; }
         }
         :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 4px; }
         .skip {
@@ -357,6 +396,7 @@
 
 {{-- ============ HERO ============ --}}
 <header class="hero">
+    <canvas id="heroCanvas" aria-hidden="true"></canvas>
     <div class="wrap">
         @auth
             {{-- A signed-in user came here to move a file, so the input is the hero.
@@ -439,8 +479,8 @@
                 </div>
             </div>
         @else
-            <h1>WetoDrive</h1>
-            <p class="tagline">Transfer files from WeTransfer to Google Drive instantly. No downloading and uploading, and no storage used on your device.</p>
+            <h1>For people who live in WeTransfer</h1>
+            <p class="tagline">Transfer files from WeTransfer to Google Drive instantly. If you take delivery of rushes, stills and masters all week, WetoDrive moves them into Drive without downloading and uploading, and without using storage on your device.</p>
             <a href="{{ route('auth.google') }}" class="btn btn-onblue btn-lg">
                 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -457,6 +497,35 @@
         @endauth
     </div>
 </header>
+
+{{-- ============ AUDIENCE MARQUEE ============ --}}
+{{-- The list is rendered twice: the animation slides the track by exactly 50%,
+     so the loop is seamless. aria-hidden on the copy stops screen readers
+     reading the whole thing twice. --}}
+@php
+    $audiences = [
+        ['Videographers', 'M23 7l-7 5 7 5V7z M14 5H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z'],
+        ['Motion designers', 'M12 2v20 M2 12h20'],
+        ['Photo studios', 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z'],
+        ['Creative agencies', 'M3 21h18 M5 21V7l8-4v18 M19 21V11l-6-4'],
+        ['Post-production', 'M9 18V5l12-2v13 M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
+        ['VFX artists', 'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z'],
+        ['Wedding filmmakers', 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 1 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8z'],
+        ['Architects', 'M3 21h18 M9 8h1 M9 12h1 M9 16h1 M14 8h1 M14 12h1 M14 16h1 M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17'],
+        ['Music producers', 'M9 18V5l12-2v13 M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M18 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
+        ['Broadcast teams', 'M4 11a9 9 0 0 1 9 9 M4 4a16 16 0 0 1 16 16 M5 19a1 1 0 1 0 0 2 1 1 0 0 0 0-2z'],
+    ];
+@endphp
+<div class="marquee">
+    <div class="marquee-track">
+        @foreach (array_merge($audiences, $audiences) as $i => $a)
+            <span class="marquee-item" @if($i >= count($audiences)) aria-hidden="true" @endif>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ $a[1] }}"/></svg>
+                {{ $a[0] }}
+            </span>
+        @endforeach
+    </div>
+</div>
 
 {{-- ============ THREE CARDS (copy is the live homepage's, word for word) ============ --}}
 <div class="wrap">
@@ -480,7 +549,7 @@
 </div>
 
 {{-- ============ HOW IT WORKS ============ --}}
-<section id="how">
+<section id="how" class="rise">
     <div class="wrap">
         <div class="head">
             <h2>Three steps, then forget about it</h2>
@@ -533,7 +602,7 @@
 {{-- ============ TESTIMONIALS ============ --}}
 {{-- Real replies to the check-in email. First name and country only: these were
      private replies, not submitted public reviews. --}}
-<section id="words" style="padding-top:0;">
+<section id="words" class="rise" style="padding-top:0;">
     <div class="wrap">
         <div class="head">
             <h2>What people write back</h2>
@@ -557,7 +626,7 @@
 </section>
 
 {{-- ============ WHY IT'S SAFE ============ --}}
-<section id="why">
+<section id="why" class="rise">
     <div class="wrap perms">
         <div>
             <h2 style="margin-bottom:18px;">We ask for less than you'd expect</h2>
@@ -596,7 +665,7 @@
 </section>
 
 {{-- ============ FAQ ============ --}}
-<section id="faq">
+<section id="faq" class="rise">
     <div class="wrap">
         <div class="head"><h2>The things people ask first</h2></div>
         <div class="faq">
@@ -695,6 +764,22 @@
                 ? "That does not look like a WeTransfer link. It should start with wetransfer.com or we.tl."
                 : "Works with full wetransfer.com links and short we.tl links.";
         });
+    })();
+
+    // Reveal decorative sections on scroll. Never applied to the transfer form,
+    // which must be visible whether or not this script runs.
+    (function () {
+        const els = document.querySelectorAll('.rise');
+        if (!els.length || !('IntersectionObserver' in window)) {
+            els.forEach(el => el.classList.add('in'));
+            return;
+        }
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+            });
+        }, { threshold: .08, rootMargin: '0px 0px -50px 0px' });
+        els.forEach(el => io.observe(el));
     })();
 
     @include('partials.transfer-script')
