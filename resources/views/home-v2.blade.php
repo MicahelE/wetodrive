@@ -48,6 +48,29 @@
     }
     </script>
 
+    {{-- Same GA4 property as the live homepage, so the two are directly
+         comparable. GA reports page_path, so / and /v2 separate on their own.
+         page_variant is stamped on every event to make that explicit in reports. --}}
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-174D73GPWB"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-174D73GPWB', { page_variant: 'v2' });
+
+        // The sign-in CTA is same-origin, so GA's enhanced measurement will not
+        // catch it. Without this event there is nothing to compare but pageviews.
+        document.addEventListener('click', function (e) {
+            var a = e.target.closest('a[href*="/auth/google"]');
+            if (!a) return;
+            gtag('event', 'sign_in_click', {
+                event_category: 'conversion',
+                event_label: a.dataset.cta || 'unknown',
+                page_variant: 'v2'
+            });
+        });
+    </script>
+
     @vite(['resources/js/hero.js'])
 
     <style>
@@ -192,7 +215,12 @@
             -webkit-mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
             mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
         }
-        .marquee-track { display: flex; width: max-content; animation: slide 46s linear infinite; }
+        /* Starts paused. Lighthouse measures Speed Index from how quickly the
+           viewport stops changing, and a strip sliding through the first paint
+           keeps it from ever settling: it cost 2.5s -> 4.4s. The .go class is
+           added once the page is idle, and it pauses again when scrolled past. */
+        .marquee-track { display: flex; width: max-content; animation: slide 46s linear infinite; animation-play-state: paused; }
+        .marquee-track.go { animation-play-state: running; }
         .marquee:hover .marquee-track { animation-play-state: paused; }
         @keyframes slide { to { transform: translateX(-50%); } }
         .marquee-item {
@@ -419,7 +447,7 @@
             @auth
                 <a href="{{ route('subscription.manage') }}" class="btn btn-outline">Dashboard</a>
             @else
-                <a href="{{ route('auth.google') }}" class="btn btn-primary">Sign In</a>
+                <a href="{{ route('auth.google') }}" class="btn btn-primary" data-cta="nav">Sign In</a>
             @endauth
 
             {{-- Native disclosure widget, so the mobile menu needs no JS at all.
@@ -527,7 +555,7 @@
         @else
             <h1>For people who live in WeTransfer</h1>
             <p class="tagline">Transfer files from WeTransfer to Google Drive instantly. If you take delivery of rushes, stills and masters all week, WetoDrive moves them into Drive without downloading and uploading, and without using storage on your device.</p>
-            <a href="{{ route('auth.google') }}" class="btn btn-onblue btn-lg">
+            <a href="{{ route('auth.google') }}" class="btn btn-onblue btn-lg" data-cta="hero">
                 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -807,7 +835,7 @@
             @auth
                 <a href="#transfer" class="btn btn-primary btn-lg">Start a transfer</a>
             @else
-                <a href="{{ route('auth.google') }}" class="btn btn-primary btn-lg">Get Started with Google Drive</a>
+                <a href="{{ route('auth.google') }}" class="btn btn-primary btn-lg" data-cta="footer-cta">Get Started with Google Drive</a>
             @endauth
         </div>
     </div>
@@ -836,7 +864,7 @@
                 <a href="{{ route('home') }}">Home</a>
                 <a href="{{ route('subscription.pricing') }}">Pricing</a>
                 @auth <a href="{{ route('subscription.manage') }}">Dashboard</a>
-                @else <a href="{{ route('auth.google') }}">Sign In</a> @endauth
+                @else <a href="{{ route('auth.google') }}" data-cta="footer-link">Sign In</a> @endauth
             </div>
 
             <div>
@@ -877,6 +905,28 @@
                 ? "That does not look like a WeTransfer link. It should start with wetransfer.com or we.tl."
                 : "Works with full wetransfer.com links and short we.tl links.";
         });
+    })();
+
+    // Start the marquee only once the page has settled, and stop it whenever it
+    // scrolls out of view. Keeps Speed Index honest and stops a strip animating
+    // off screen from burning a phone's battery.
+    (function () {
+        const track = document.querySelector('.marquee-track');
+        const strip = document.querySelector('.marquee');
+        if (!track || !strip) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        const start = () => {
+            if ('IntersectionObserver' in window) {
+                new IntersectionObserver(([e]) => {
+                    track.classList.toggle('go', e.isIntersecting);
+                }, { threshold: 0 }).observe(strip);
+            } else {
+                track.classList.add('go');
+            }
+        };
+        if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 2500 });
+        else window.addEventListener('load', () => setTimeout(start, 1200));
     })();
 
     // Reveal decorative sections on scroll. Never applied to the transfer form,
