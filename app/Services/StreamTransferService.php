@@ -173,21 +173,37 @@ class StreamTransferService
     }
 
     /**
+     * Split a WeTransfer download URL into [transfer_id, security_hash].
+     *
+     * There are two link shapes and only one was handled. The sender's own page
+     * gives /downloads/{id}/{hash}; the "you received files" email gives
+     * /downloads/{id}/{recipient_id}/{hash}. Taking the second segment blindly
+     * sent the recipient id to the API as the security hash, which answers 403.
+     * That surfaced as WETRANSFER_EXPIRED, so it read as an expired link rather
+     * than our bug, and it broke every transfer started from a WeTransfer email
+     * between 2026-08-07 and 2026-08-15. The hash is always the LAST segment.
+     */
+    public static function parseDownloadUrl(string $pageUrl): array
+    {
+        // The optional group absorbs the recipient id when it is there, and the
+        // regex backtracks out of it on two-segment links.
+        $pattern = '#wetransfer\.com/downloads/([a-f0-9]+)(?:/[a-f0-9]+)?/([a-f0-9]+)#';
+
+        if (! preg_match($pattern, $pageUrl, $matches)) {
+            throw new \Exception('Invalid WeTransfer URL format');
+        }
+
+        return [$matches[1], $matches[2]];
+    }
+
+    /**
      * Get direct download link from WeTransfer page
      */
     private function getDirectDownloadLink(string $pageUrl): string
     {
         Log::info('Getting direct download link', ['page_url' => $pageUrl]);
 
-        // Extract transfer ID and security hash
-        preg_match('/wetransfer\.com\/downloads\/([a-f0-9]+)\/([a-f0-9]+)/', $pageUrl, $matches);
-
-        if (count($matches) < 3) {
-            throw new \Exception('Invalid WeTransfer URL format');
-        }
-
-        $transferId = $matches[1];
-        $securityHash = $matches[2];
+        [$transferId, $securityHash] = self::parseDownloadUrl($pageUrl);
 
         $cookieJar = new CookieJar();
 

@@ -813,17 +813,14 @@ class TransferController extends Controller
     {
         Log::info('Fetching direct download link from WeTransfer page', ['page_url' => $pageUrl]);
         
-        // Extract transfer ID and security hash from URL
-        // Pattern: https://wetransfer.com/downloads/{transfer_id}/{security_hash}
-        preg_match('/wetransfer\.com\/downloads\/([a-f0-9]+)\/([a-f0-9]+)/', $pageUrl, $matches);
-        
-        if (count($matches) < 3) {
+        // Shapes: /downloads/{transfer_id}/{security_hash} from the sender page,
+        // /downloads/{transfer_id}/{recipient_id}/{security_hash} from the email.
+        try {
+            [$transferId, $securityHash] = StreamTransferService::parseDownloadUrl($pageUrl);
+        } catch (\Exception $e) {
             Log::error('Could not extract transfer ID from URL', ['url' => $pageUrl]);
-            throw new \Exception('Invalid WeTransfer URL format');
+            throw $e;
         }
-        
-        $transferId = $matches[1];
-        $securityHash = $matches[2];
         
         Log::info('Extracted transfer details', [
             'transfer_id' => $transferId,
