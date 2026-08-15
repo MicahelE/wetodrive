@@ -144,6 +144,36 @@
         }
         .hero > .wrap { position: relative; z-index: 1; }
 
+        /* ============ Live product demo ============ */
+        /* This is the real transfer panel rebuilt in markup rather than a
+           screenshot: identical styling, sharp on any display, animated, and it
+           costs bytes we were going to spend on the HTML anyway. A photo of the
+           same thing would have been 50-200KB on a server with no compression. */
+        .demo {
+            background: var(--white); color: var(--ink); border-radius: var(--r);
+            padding: 20px; max-width: 520px; margin: 34px auto 0;
+            box-shadow: var(--shadow-lg); text-align: left;
+        }
+        .demo-top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .demo-dot { width: 9px; height: 9px; border-radius: var(--r-full); background: #34A853; }
+        .demo-title { font-weight: 650; font-size: .93rem; }
+        .demo-file { margin-left: auto; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+        .demo-name { font-size: .92rem; font-weight: 600; margin-bottom: 9px; display: flex; align-items: center; gap: 8px; }
+        .demo-bar { background: var(--blue-soft); border-radius: var(--r-full); height: 10px; overflow: hidden; }
+        .demo-fill {
+            height: 100%; width: 0%; border-radius: var(--r-full);
+            background: linear-gradient(90deg, #4285F4, #34A853);
+            animation: fill 7s cubic-bezier(.25,.7,.35,1) infinite;
+        }
+        @keyframes fill { 0% { width: 0; } 78% { width: 100%; } 100% { width: 100%; } }
+        .demo-foot { display: flex; justify-content: space-between; margin-top: 10px; font-size: .8rem; color: var(--muted); }
+        .demo-done {
+            display: flex; align-items: center; gap: 8px; margin-top: 13px; padding-top: 12px;
+            border-top: 1px solid var(--line); font-size: .85rem; color: #1E7E38; font-weight: 600;
+            opacity: 0; animation: showDone 7s linear infinite;
+        }
+        @keyframes showDone { 0%, 76% { opacity: 0; } 84%, 100% { opacity: 1; } }
+
         /* ============ Audience marquee ============ */
         /* CSS-only infinite scroll: the track holds the list twice and slides by
            exactly half, so the seam is invisible and it needs no JS. */
@@ -500,6 +530,33 @@
             <div class="fineprint">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 We can add files to your Drive, and nothing else. Your first transfer is free.
+            </div>
+
+            {{-- An illustration of the transfer screen, not a record of one: the
+                 filename and size are representative. Marked aria-hidden because
+                 it repeats what the copy above already says. --}}
+            <div class="demo" aria-hidden="true">
+                <div class="demo-top">
+                    <span class="demo-dot"></span>
+                    <span class="demo-title">Transfer in progress</span>
+                    <span class="demo-file">Premium plan</span>
+                </div>
+                <div class="demo-name">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <rect x="3" y="3" width="14" height="18" rx="2" fill="#4285F4"/>
+                        <path d="M7 9h6M7 13h4" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                    wedding_4k_masters.zip
+                </div>
+                <div class="demo-bar"><div class="demo-fill"></div></div>
+                <div class="demo-foot">
+                    <span>48.2 GB</span>
+                    <span>streaming to Drive</span>
+                </div>
+                <div class="demo-done">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1E7E38" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                    Saved to your Google Drive
+                </div>
             </div>
         @endauth
     </div>
