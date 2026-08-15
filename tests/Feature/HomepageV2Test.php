@@ -41,6 +41,39 @@ class HomepageV2Test extends TestCase
         $this->get('/v2')->assertSee('<title>WetoDrive - WeTransfer to Google Drive</title>', false);
     }
 
+    /**
+     * GSC: this page is #1 for "wetodrive" (93 clicks, 77% CTR) and #3.2 for
+     * "wetransfer to google drive" (40 clicks). The live page's H1 is the bare
+     * brand name, so the replacement's H1 must carry both terms.
+     */
+    public function test_the_h1_carries_the_brand_and_the_primary_keyword(): void
+    {
+        preg_match('#<h1[^>]*>(.*?)</h1>#s', $this->get('/v2')->getContent(), $m);
+
+        $this->assertNotEmpty($m, 'no h1 on the page');
+        $h1 = strtolower(strip_tags($m[1]));
+
+        $this->assertStringContainsString('wetodrive', $h1, 'h1 lost the brand term');
+        $this->assertStringContainsString('wetransfer', $h1, 'h1 lost the wetransfer term');
+        $this->assertStringContainsString('google drive', $h1, 'h1 lost the google drive term');
+    }
+
+    public function test_it_mentions_the_brand_at_least_as_often_as_the_live_page(): void
+    {
+        $count = fn ($html) => substr_count(
+            strtolower(preg_replace('#<script.*?</script>|<style.*?</style>#s', ' ', $html)),
+            'wetodrive'
+        );
+
+        // Brand prominence is the signal behind the #1 ranking; the redesign must
+        // not quietly thin it out.
+        $this->assertGreaterThanOrEqual(
+            $count($this->get('/')->getContent()),
+            $count($this->get('/v2')->getContent()),
+            'v2 mentions the brand less often than the live homepage'
+        );
+    }
+
     public function test_it_links_every_seo_landing_page_with_the_same_anchor_text(): void
     {
         $html = $this->get('/v2')->assertOk()->getContent();

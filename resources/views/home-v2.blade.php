@@ -553,8 +553,12 @@
                 </div>
             </div>
         @else
-            <h1>For people who live in WeTransfer</h1>
-            <p class="tagline">Transfer files from WeTransfer to Google Drive instantly. If you take delivery of rushes, stills and masters all week, WetoDrive moves them into Drive without downloading and uploading, and without using storage on your device.</p>
+            {{-- The H1 has to carry the brand and the primary keyword. GSC shows
+                 this page at #1 for "wetodrive" (93 clicks, 77% CTR) and #3 for
+                 "wetransfer to google drive" (40 clicks); the live page's H1 is
+                 literally "WetoDrive". An H1 without either was a real regression. --}}
+            <h1>WetoDrive sends WeTransfer straight to Google Drive</h1>
+            <p class="tagline">Transfer files from WeTransfer to Google Drive instantly. If you take delivery of rushes, stills and masters all week, WetoDrive moves them into your Drive without downloading and uploading, and without using storage on your device.</p>
             <a href="{{ route('auth.google') }}" class="btn btn-onblue btn-lg" data-cta="hero">
                 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
