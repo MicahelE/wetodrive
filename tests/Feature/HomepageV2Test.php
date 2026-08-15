@@ -60,10 +60,13 @@ class HomepageV2Test extends TestCase
 
     public function test_it_mentions_the_brand_at_least_as_often_as_the_live_page(): void
     {
-        $count = fn ($html) => substr_count(
-            strtolower(preg_replace('#<script.*?</script>|<style.*?</style>#s', ' ', $html)),
-            'wetodrive'
-        );
+        // Count only text a reader (and a crawler) actually sees. Counting raw
+        // HTML flatters v2, whose meta tags and JSON-LD mention the brand while
+        // the live page has none of those.
+        $count = function ($html) {
+            $stripped = preg_replace('#<script.*?</script>|<style.*?</style>#s', ' ', $html);
+            return substr_count(strtolower(strip_tags($stripped)), 'wetodrive');
+        };
 
         // Brand prominence is the signal behind the #1 ranking; the redesign must
         // not quietly thin it out.
