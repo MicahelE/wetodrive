@@ -53,7 +53,9 @@ class StreamProgressController extends Controller
                             'totalBytes' => $progress['totalBytes'] ?? 0,
                             'percentage' => $progress['percentage'] ?? 0,
                             'status' => $progress['status'] ?? 'transferring',
-                            'filename' => $progress['filename'] ?? 'Unknown'
+                            'filename' => $progress['filename'] ?? 'Unknown',
+                            'fileIndex' => $progress['fileIndex'] ?? null,
+                            'fileCount' => $progress['fileCount'] ?? null
                         ];
 
                         echo "data: " . json_encode($data) . "\n\n";
@@ -118,7 +120,7 @@ class StreamProgressController extends Controller
     /**
      * Update transfer progress (called internally by transfer service)
      */
-    public static function updateProgress(string $transferId, int $bytesTransferred, int $totalBytes, string $filename = null, string $status = 'transferring')
+    public static function updateProgress(string $transferId, int $bytesTransferred, int $totalBytes, ?string $filename = null, string $status = 'transferring', ?int $fileIndex = null, ?int $fileCount = null)
     {
         $percentage = $totalBytes > 0 ? round(($bytesTransferred / $totalBytes) * 100, 2) : 0;
 
@@ -128,6 +130,10 @@ class StreamProgressController extends Controller
             'percentage' => $percentage,
             'status' => $status,
             'filename' => $filename,
+            // Set only for multi-file transfers, so the UI can say "File 3 of 12"
+            // while the bar tracks the batch rather than the current file.
+            'fileIndex' => $fileIndex,
+            'fileCount' => $fileCount,
             'timestamp' => time()
         ];
 
@@ -142,10 +148,21 @@ class StreamProgressController extends Controller
     }
 
     /**
-     * Mark transfer as completed
+     * Mark transfer as completed, optionally with its result.
+     *
+     * ORDER MATTERS. streamProgress() watches the progress status and, the
+     * instant it turns completed/failed, reads transfer_result_* and emits the
+     * complete event. Writing the status first leaves a window where the result
+     * is not there yet, and the page shows "Transfer Complete" with no files and
+     * no link. Pass $result here so the two are always written the right way
+     * round rather than relying on every caller to remember.
      */
-    public static function completeTransfer(string $transferId, bool $success = true)
+    public static function completeTransfer(string $transferId, bool $success = true, ?array $result = null)
     {
+        if ($result !== null) {
+            Cache::put("transfer_result_{$transferId}", $result, 900);
+        }
+
         $progress = Cache::get("transfer_progress_{$transferId}");
 
         if ($progress) {

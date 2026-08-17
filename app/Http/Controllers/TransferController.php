@@ -15,6 +15,7 @@ use App\Mail\OversizeTransferAlertMail;
 use App\Mail\TransferCompleteMail;
 use App\Mail\TransferFailedMail;
 use App\Mail\UpgradeNudgeMail;
+use App\Services\DriveFolderService;
 use App\Services\StreamTransferService;
 use App\Services\ResumableDownloader;
 use App\Http\Controllers\StreamProgressController;
@@ -22,6 +23,7 @@ use App\Models\SubscriptionPlan;
 use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class TransferController extends Controller
 {
@@ -62,7 +64,48 @@ class TransferController extends Controller
             ? StreamProgressController::activeTransferFor(Auth::id())
             : null;
 
-        return view('home', compact('stats', 'activeTransfer'));
+        // Folders this app made for this user. Under the drive.file scope these
+        // are the only ones it can see, so this list is the whole picker.
+        $recentFolders = Auth::check()
+            ? Auth::user()->driveFolders()
+                ->orderByDesc('last_used_at')
+                ->limit(5)
+                ->pluck('path')
+                ->all()
+            : [];
+
+        return view('home', compact('stats', 'activeTransfer', 'recentFolders'));
+    }
+
+    /**
+     * A short-lived Drive access token for the Google Picker.
+     *
+     * The Picker runs in the browser and needs the user's own token to show
+     * their Drive. Handed out from here rather than rendered into the page so it
+     * is never sitting in cached HTML, and so it is refreshed on demand rather
+     * than going stale on a page left open.
+     */
+    public function pickerToken(Request $request)
+    {
+        try {
+            $token = (new StreamTransferService())->getGoogleClient($request->user())->getAccessToken();
+
+            $payload = [
+                'token' => $token['access_token'] ?? null,
+                'app_id' => config('services.google.picker_app_id'),
+                'developer_key' => config('services.google.picker_key'),
+            ];
+            $status = 200;
+        } catch (\Throwable $e) {
+            Log::warning('Could not mint a picker token', ['user_id' => $request->user()->id, 'error' => $e->getMessage()]);
+
+            $payload = ['error' => 'Reconnect your Google Drive to browse folders.'];
+            $status = 401;
+        }
+
+        // no-store on both paths: this carries an access token, and a cached copy
+        // in a proxy or the browser would outlive the token's usefulness.
+        return response()->json($payload, $status)->header('Cache-Control', 'no-store');
     }
 
     public function transfer(Request $request)
@@ -74,7 +117,11 @@ class TransferController extends Controller
 
         $request->validate([
             'wetransfer_url' => 'required|url',
-            'use_streaming' => 'boolean'
+            'use_streaming' => 'boolean',
+            'destination_folder' => 'nullable|string|max:255',
+            // Set when the folder came from the Google Picker, in which case it
+            // already exists and must not be created from its name.
+            'destination_folder_id' => 'nullable|string|max:255',
         ]);
 
         if (!Auth::check()) {
@@ -113,20 +160,62 @@ class TransferController extends Controller
             );
         }
 
+        // Resolved here, while the request is still in hand. Every transfer path
+        // below sends its response and detaches before doing any work, so a bad
+        // folder resolved down there would fail invisibly in a background worker.
+        try {
+            $pickedId = $request->input('destination_folder_id');
+
+            if ($pickedId) {
+                // Chosen through the Picker, so it already exists in their Drive
+                // and picking is what granted us access to it. Creating anything
+                // here would make a duplicate beside the folder they chose.
+                $folderId = $pickedId;
+                $folderLabel = $request->input('destination_folder') ?: 'Selected folder';
+                DriveFolderService::for($user)->remember($user, $folderLabel, $pickedId);
+            } else {
+                // Normalised first, on its own: it is pure string work, so a bad
+                // path is rejected without ever touching Google.
+                $folderLabel = DriveFolderService::normalizePath($request->input('destination_folder'));
+                $folderId = DriveFolderService::for($user)->resolve($user, $folderLabel);
+            }
+        } catch (\InvalidArgumentException $e) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
+            }
+
+            return redirect()->back()->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            Log::error('Could not resolve destination folder', [
+                'user_id' => $user->id,
+                'folder' => $request->input('destination_folder'),
+                'error' => $e->getMessage(),
+            ]);
+
+            $message = 'Could not open that Google Drive folder. Please try again or reconnect your account.';
+
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'error' => $message], 500);
+            }
+
+            return redirect()->back()->with('error', $message);
+        }
+
         try {
             $wetransferUrl = $request->wetransfer_url;
             Log::info('Starting WeTransfer process', [
                 'url' => $wetransferUrl,
                 'use_streaming' => $useStreaming,
+                'folder_id' => $folderId,
                 'is_ajax' => $request->ajax()
             ]);
 
             if ($useStreaming) {
                 // Use new streaming approach
-                return $this->transferWithStreaming($wetransferUrl, $user, $request);
+                return $this->transferWithStreaming($wetransferUrl, $user, $request, $folderId, $folderLabel);
             } else {
                 // Use legacy disk-based approach
-                return $this->transferWithDisk($wetransferUrl, $user);
+                return $this->transferWithDisk($wetransferUrl, $user, $folderId);
             }
         } catch (\Exception $e) {
             Log::error('Transfer failed', [
@@ -164,25 +253,47 @@ class TransferController extends Controller
     /**
      * Transfer using direct streaming (no temporary files)
      */
-    private function transferWithStreaming(string $wetransferUrl, $user, Request $request)
+    private function transferWithStreaming(string $wetransferUrl, $user, Request $request, ?string $folderId = null, string $folderLabel = "")
     {
         $streamService = new StreamTransferService();
         $transferId = uniqid('transfer_', true);
 
         try {
-            // Parse WeTransfer URL to get download link
-            $downloadUrl = $streamService->parseWeTransferUrl($wetransferUrl);
-            Log::info('Parsed download URL for streaming', ['download_url' => $downloadUrl]);
+            // Ask what is inside the transfer before fetching anything. When the
+            // files can be taken individually we never touch the archive at all,
+            // which is both the point of the feature and one fewer large download.
+            $pageUrl = $streamService->resolvePageUrl($wetransferUrl);
+            $listing = $streamService->listItems($pageUrl);
+            $items = $listing['items'];
+            $downloadUrl = null;
 
-            // Get file metadata
-            $fileInfo = [];
-            $stream = $streamService->getWeTransferStream($downloadUrl, $fileInfo);
+            if ($items) {
+                // Sizes come from the manifest, so no stream is opened to weigh it.
+                $fileInfo = [
+                    'filename' => $listing['title'],
+                    'size' => $listing['size'] ?: array_sum(array_column($items, 'size')),
+                    'mimeType' => 'application/octet-stream',
+                ];
 
-            Log::info('Got WeTransfer stream', [
-                'filename' => $fileInfo['filename'],
-                'size' => $fileInfo['size'],
-                'mimeType' => $fileInfo['mimeType']
-            ]);
+                Log::info('Transfer can be imported file by file', [
+                    'file_count' => count($items),
+                    'total_size' => $fileInfo['size'],
+                ]);
+            } else {
+                // Falls back to the whole archive: a folder upload, or anything
+                // whose shape we do not recognise. Delivering the zip is never wrong.
+                $downloadUrl = $streamService->parseWeTransferUrl($wetransferUrl);
+                Log::info('Parsed download URL for streaming', ['download_url' => $downloadUrl]);
+
+                $fileInfo = [];
+                $streamService->getWeTransferStream($downloadUrl, $fileInfo);
+
+                Log::info('Got WeTransfer stream', [
+                    'filename' => $fileInfo['filename'],
+                    'size' => $fileInfo['size'],
+                    'mimeType' => $fileInfo['mimeType']
+                ]);
+            }
 
             // Validate file size against subscription limits, claiming the
             // one-time trial allowance atomically if this transfer needs it.
@@ -232,6 +343,21 @@ class TransferController extends Controller
             // ponytail: one live transfer per user, which is all the UI supports.
             Cache::put("active_transfer_{$user->id}", $transferId, 900);
 
+            // Import the files individually whenever we can. A single-file
+            // transfer is just a batch of one, so this is the ordinary path
+            // rather than a special case, and gets exercised constantly.
+            if ($items && $request->ajax()) {
+                return $this->importBatch(
+                    $pageUrl, $items, $user, $transferId, $folderId, $claimedTrial,
+                    $fileInfo['size'], $listing['title'], $streamService, $folderLabel
+                );
+            }
+
+            // Everything below works on the whole archive. Reached either by the
+            // fallback above (where it is already resolved) or by a non-Ajax post
+            // of a listable transfer, which still needs the link.
+            $downloadUrl ??= $streamService->parseWeTransferUrl($wetransferUrl);
+
             // For files < 1GB, use disk-based approach (more reliable)
             if ($fileInfo['size'] < 1024 * 1024 * 1024) {
                 Log::info('Using disk-based transfer for file < 1GB', [
@@ -241,7 +367,8 @@ class TransferController extends Controller
                 return $this->transferWithDiskAsync(
                     $downloadUrl, $user, $request, $fileInfo, $transferId, $claimedTrial,
                     // Re-mint a fresh direct link (new 10-min token) on resume.
-                    fn () => $streamService->parseWeTransferUrl($wetransferUrl)
+                    fn () => $streamService->parseWeTransferUrl($wetransferUrl),
+                    $folderId
                 );
             }
 
@@ -311,7 +438,7 @@ class TransferController extends Controller
                         'download_url_length' => strlen($downloadUrl)
                     ]);
 
-                    $googleDriveFileId = $streamService->streamTransfer($downloadUrl, $fileInfo, $user, $transferId);
+                    $googleDriveFileId = $streamService->streamTransfer($downloadUrl, $fileInfo, $user, $transferId, $folderId);
 
                     $transferEndTime = microtime(true);
                     $transferDuration = $transferEndTime - $transferStartTime;
@@ -339,14 +466,13 @@ class TransferController extends Controller
                     ]);
 
                     // Mark transfer as complete and store result
-                    StreamProgressController::completeTransfer($transferId, true);
-                    Cache::put("transfer_result_{$transferId}", [
+                    StreamProgressController::completeTransfer($transferId, true, [
                         'success' => true,
                         'google_drive_id' => $googleDriveFileId,
                         'filename' => $fileInfo['filename'],
                         // Nudge non-paid users to upgrade at the moment of value.
                         'show_upgrade_prompt' => !$user->hasActiveSubscription(),
-                    ], 300);
+                    ]);
 
                     try {
                         $driveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
@@ -396,12 +522,11 @@ class TransferController extends Controller
                     }
 
                     // Mark transfer as failed
-                    StreamProgressController::completeTransfer($transferId, false);
-                    Cache::put("transfer_result_{$transferId}", [
+                    StreamProgressController::completeTransfer($transferId, false, [
                         'success' => false,
                         'error' => $errorMessage,
                         'needs_reconnect' => $needsReconnect
-                    ], 300);
+                    ]);
 
                     try {
                         Log::info('Sending transfer failed email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
@@ -421,7 +546,7 @@ class TransferController extends Controller
             }
 
             // For non-Ajax requests, process synchronously
-            $googleDriveFileId = $streamService->streamTransfer($downloadUrl, $fileInfo, $user, $transferId);
+            $googleDriveFileId = $streamService->streamTransfer($downloadUrl, $fileInfo, $user, $transferId, $folderId);
 
             Log::info('File streamed to Google Drive successfully', [
                 'filename' => $fileInfo['filename'],
@@ -498,11 +623,263 @@ class TransferController extends Controller
     }
 
     /**
+     * Import each file in a transfer separately, rather than delivering the zip.
+     *
+     * A zip in Drive cannot be previewed, opened or searched inside, so for the
+     * people this product is for it is delivered but not usable. This walks the
+     * transfer's manifest and puts each file in Drive on its own.
+     *
+     * Responds and detaches once, up front, then does the whole batch in the
+     * background: the transfer outlives the browser exactly as a single-file one
+     * does. Quota is charged once for the link no matter how many files are in
+     * it, which is how people think about a WeTransfer link.
+     */
+    private function importBatch(
+        string $pageUrl,
+        array $items,
+        $user,
+        string $transferId,
+        ?string $folderId,
+        bool $claimedTrial,
+        int $totalSize,
+        string $title,
+        StreamTransferService $streamService,
+        string $folderLabel = ''
+    ) {
+        $fileCount = count($items);
+
+        StreamProgressController::updateProgress(
+            $transferId, 0, $totalSize, $items[0]['name'], 'starting', 1, $fileCount
+        );
+
+        $response = response()->json([
+            'success' => true,
+            'transfer_id' => $transferId,
+            'filename' => $title,
+            'size' => $totalSize,
+            'file_count' => $fileCount,
+            'status' => 'processing',
+        ]);
+
+        $response->send();
+
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        } else {
+            if (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            flush();
+        }
+
+        ignore_user_abort(true);
+        set_time_limit(0);
+
+        $batchId = (string) Str::uuid();
+        $delivered = [];
+        $failed = [];
+        $bytesDone = 0;
+        $folders = DriveFolderService::for($user);
+
+        foreach ($items as $index => $item) {
+            $position = $index + 1;
+
+            try {
+                Log::info('[BATCH] Importing file', [
+                    'transfer_id' => $transferId,
+                    'batch_id' => $batchId,
+                    'file' => $item['name'],
+                    'position' => "{$position}/{$fileCount}",
+                ]);
+
+                // A folder upload arrives as files named "Dir/Sub/file.mov", so
+                // the structure the sender had is rebuilt under the destination
+                // rather than becoming a slash in the filename.
+                $relativeDir = trim(str_replace('\\', '/', dirname($item['name'])), '.');
+                $itemFolderId = $relativeDir === ''
+                    ? $folderId
+                    : $folders->resolveWithin($user, $folderId, $folderLabel, $relativeDir);
+
+                $driveId = $this->importOneFile(
+                    $streamService, $pageUrl, $item, $user, $transferId, $itemFolderId,
+                    $bytesDone, $totalSize, $position, $fileCount
+                );
+
+                Transfer::create([
+                    'user_id' => $user->id,
+                    'batch_id' => $batchId,
+                    'filename' => $item['name'],
+                    'file_size' => $item['size'],
+                    'google_drive_id' => $driveId,
+                    'transferred_at' => now(),
+                ]);
+
+                $delivered[] = [
+                    'filename' => $item['name'],
+                    'google_drive_id' => $driveId,
+                    'size' => $item['size'],
+                ];
+            } catch (\Throwable $e) {
+                // One bad file does not throw away the ones already in Drive.
+                Log::error('[BATCH] File failed, continuing with the rest', [
+                    'transfer_id' => $transferId,
+                    'file' => $item['name'],
+                    'error' => $e->getMessage(),
+                ]);
+
+                $failed[] = ['filename' => $item['name'], 'error' => $e->getMessage()];
+            }
+
+            $bytesDone += $item['size'];
+        }
+
+        $this->finishBatch($user, $transferId, $folderId, $claimedTrial, $delivered, $failed, $title, $totalSize);
+
+        return;
+    }
+
+    /**
+     * Download one file out of a transfer and put it in Drive.
+     *
+     * Keeps the size rule the single-file path already used: stream the big ones
+     * so they never touch the disk, buffer the small ones because it is more
+     * reliable. $bytesBefore is what the batch had already moved, so the bar
+     * tracks the whole transfer rather than restarting on every file.
+     */
+    private function importOneFile(
+        StreamTransferService $streamService,
+        string $pageUrl,
+        array $item,
+        $user,
+        string $transferId,
+        ?string $folderId,
+        int $bytesBefore,
+        int $totalSize,
+        int $position,
+        int $fileCount
+    ): string {
+        $link = $streamService->directLinkForItem($pageUrl, $item['id']);
+
+        // Drive does not treat "/" as a path separator, so uploading the raw name
+        // would make one flat file literally called "Shoot Day 1/Selects/x.mov".
+        // The directories are folders in Drive; only the basename is the file.
+        $item['name'] = basename(str_replace('\\', '/', $item['name']));
+
+        $report = function (float $fraction, string $status) use ($transferId, $item, $bytesBefore, $totalSize, $position, $fileCount) {
+            StreamProgressController::updateProgress(
+                $transferId,
+                (int) ($bytesBefore + $item['size'] * min(max($fraction, 0), 1)),
+                $totalSize,
+                $item['name'],
+                $status,
+                $position,
+                $fileCount,
+            );
+        };
+
+        // Large files stream straight through, no temp file involved.
+        if ($item['size'] >= 1024 * 1024 * 1024) {
+            $fileInfo = ['filename' => $item['name'], 'size' => $item['size'], 'mimeType' => 'application/octet-stream'];
+
+            $streamService->setProgressCallback(function ($uploaded, $total) use ($report) {
+                $report($total > 0 ? $uploaded / $total : 0, 'uploading');
+            });
+
+            return $streamService->streamTransfer($link, $fileInfo, $user, null, $folderId);
+        }
+
+        // Download counts as the first half of this file, upload as the second.
+        $downloaded = $this->downloadFile(
+            $link,
+            fn ($done, $total) => $report($total > 0 ? ($done / $total) * 0.5 : 0, 'downloading'),
+            fn () => $streamService->directLinkForItem($pageUrl, $item['id']),
+        );
+
+        // downloadFile takes the name from WeTransfer's content-disposition, and
+        // for a folder upload that header carries the full path. Left alone, Drive
+        // would hold a file literally named "Shoot Day 1/Selects/hero-take.mov"
+        // sitting inside the Selects folder we just built for it.
+        $downloaded['filename'] = $item['name'];
+
+        try {
+            return $this->uploadToGoogleDrive(
+                $downloaded,
+                $user,
+                fn ($done, $total) => $report(0.5 + ($total > 0 ? ($done / $total) * 0.5 : 0), 'uploading'),
+                $folderId,
+            );
+        } finally {
+            // downloadFile writes to storage/temp; the disk fills up otherwise.
+            if (!empty($downloaded['temp_file']) && file_exists($downloaded['temp_file'])) {
+                @unlink($downloaded['temp_file']);
+            }
+        }
+    }
+
+    /**
+     * Close out a batch: charge it once, tell the page, and email once.
+     *
+     * Quota is only consumed when something actually landed. A transfer where
+     * every file failed has cost the user nothing, so it should not cost them a
+     * transfer either.
+     */
+    private function finishBatch($user, string $transferId, ?string $folderId, bool $claimedTrial, array $delivered, array $failed, string $title, int $totalSize): void
+    {
+        $anyDelivered = count($delivered) > 0;
+
+        if ($anyDelivered) {
+            $user->incrementTransferCount();
+        } elseif ($claimedTrial) {
+            $user->releaseTrialTransfer();
+        }
+
+        $folderUrl = $folderId ? "https://drive.google.com/drive/folders/{$folderId}" : null;
+
+        StreamProgressController::completeTransfer($transferId, $anyDelivered, [
+            'success' => $anyDelivered,
+            'files' => $delivered,
+            'failed' => $failed,
+            'file_count' => count($delivered),
+            'folder_url' => $folderUrl,
+            'filename' => $title,
+            // A single-file batch keeps the old shape so the existing UI still works.
+            'google_drive_id' => $anyDelivered && count($delivered) === 1 ? $delivered[0]['google_drive_id'] : null,
+            'error' => $anyDelivered ? null : ($failed[0]['error'] ?? 'Transfer failed'),
+            'show_upgrade_prompt' => $anyDelivered && !$user->hasActiveSubscription(),
+        ]);
+
+        try {
+            $summary = count($delivered) === 1
+                ? $delivered[0]['filename']
+                : count($delivered) . ' files from ' . $title;
+
+            if ($anyDelivered) {
+                Mail::to($user)->send(new TransferCompleteMail(
+                    $user,
+                    $summary,
+                    $this->formatFileSize($totalSize),
+                    $folderUrl ?? 'https://drive.google.com/drive/my-drive',
+                ));
+            } else {
+                Mail::to($user)->send(new TransferFailedMail($user, $title, $failed[0]['error'] ?? 'Transfer failed'));
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to send batch transfer email', ['error' => $e->getMessage()]);
+        }
+
+        Log::info('[BATCH] Finished', [
+            'transfer_id' => $transferId,
+            'delivered' => count($delivered),
+            'failed' => count($failed),
+        ]);
+    }
+
+    /**
      * Transfer using disk-based approach with async AJAX pattern
      * Downloads to temp file, then uploads to Google Drive
      * Used for files < 1GB for better reliability
      */
-    private function transferWithDiskAsync(string $downloadUrl, $user, Request $request, array $fileInfo, string $transferId, bool $claimedTrial = false, ?callable $refreshUrl = null)
+    private function transferWithDiskAsync(string $downloadUrl, $user, Request $request, array $fileInfo, string $transferId, bool $claimedTrial = false, ?callable $refreshUrl = null, ?string $folderId = null)
     {
         if ($request->ajax()) {
             Log::info('[AJAX] Processing disk-based transfer (async)', [
@@ -563,7 +940,7 @@ class TransferController extends Controller
                     $percentage = 50 + ($total > 0 ? ($uploaded / $total) * 50 : 0);
                     $bytesProgress = (int)($totalSize * $percentage / 100);
                     StreamProgressController::updateProgress($transferId, $bytesProgress, $totalSize, $fileInfo['filename'], 'uploading');
-                });
+                }, $folderId);
 
                 Log::info('[AJAX] Disk-based transfer completed successfully', [
                     'transfer_id' => $transferId,
@@ -584,14 +961,13 @@ class TransferController extends Controller
                 ]);
 
                 // Mark transfer as complete and store result
-                StreamProgressController::completeTransfer($transferId, true);
-                Cache::put("transfer_result_{$transferId}", [
+                StreamProgressController::completeTransfer($transferId, true, [
                     'success' => true,
                     'google_drive_id' => $googleDriveFileId,
                     'filename' => $fileInfo['filename'],
                     // Nudge non-paid users to upgrade at the moment of value.
                     'show_upgrade_prompt' => !$user->hasActiveSubscription(),
-                ], 300);
+                ]);
 
                 try {
                     $driveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
@@ -636,12 +1012,11 @@ class TransferController extends Controller
                 }
 
                 // Mark transfer as failed
-                StreamProgressController::completeTransfer($transferId, false);
-                Cache::put("transfer_result_{$transferId}", [
+                StreamProgressController::completeTransfer($transferId, false, [
                     'success' => false,
                     'error' => $errorMessage,
                     'needs_reconnect' => $needsReconnect
-                ], 300);
+                ]);
 
                 try {
                     Log::info('Sending transfer failed email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
@@ -660,13 +1035,13 @@ class TransferController extends Controller
         }
 
         // Non-AJAX: use legacy disk-based approach with redirects
-        return $this->transferWithDisk($downloadUrl, $user);
+        return $this->transferWithDisk($downloadUrl, $user, $folderId);
     }
 
 /**
      * Transfer using legacy disk-based approach
      */
-    private function transferWithDisk(string $wetransferUrl, $user)
+    private function transferWithDisk(string $wetransferUrl, $user, ?string $folderId = null)
     {
         $claimedTrial = false;
 
@@ -725,7 +1100,7 @@ class TransferController extends Controller
                 );
             }
 
-            $googleDriveFileId = $this->uploadToGoogleDrive($fileInfo, $user);
+            $googleDriveFileId = $this->uploadToGoogleDrive($fileInfo, $user, null, $folderId);
             Log::info('File uploaded to Google Drive successfully', [
                 'filename' => $fileInfo['filename'],
                 'file_id' => $googleDriveFileId
@@ -1115,12 +1490,13 @@ class TransferController extends Controller
         }
     }
 
-    private function uploadToGoogleDrive($fileInfo, $user, $progressCallback = null)
+    private function uploadToGoogleDrive($fileInfo, $user, $progressCallback = null, ?string $folderId = null)
     {
         Log::info('Starting Google Drive upload', [
             'filename' => $fileInfo['filename'],
             'size' => $fileInfo['size'],
-            'temp_file' => $fileInfo['temp_file']
+            'temp_file' => $fileInfo['temp_file'],
+            'folder_id' => $folderId
         ]);
         
         $tempFile = $fileInfo['temp_file'];
@@ -1186,10 +1562,16 @@ class TransferController extends Controller
 
             $service = new Google_Service_Drive($client);
 
-            $fileMetadata = new Google_Service_Drive_DriveFile([
-                'name' => $fileInfo['filename']
-            ]);
-            
+            $metadata = ['name' => $fileInfo['filename']];
+
+            // Omitted rather than null: Drive reads a missing parents key as
+            // "My Drive root", which is the pre-folder behaviour.
+            if ($folderId) {
+                $metadata['parents'] = [$folderId];
+            }
+
+            $fileMetadata = new Google_Service_Drive_DriveFile($metadata);
+
             Log::info('Uploading to Google Drive from disk', [
                 'filename' => $fileInfo['filename'],
                 'size' => $fileInfo['size'],

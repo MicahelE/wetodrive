@@ -40,6 +40,15 @@ return [
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
         'chunk_size' => env('GOOGLE_DRIVE_CHUNK_SIZE', 10485760), // Default 10MB, can be configured via env
+
+        // Google Picker. The key is sent to the browser by design, so it must be
+        // referrer-restricted in Cloud Console rather than treated as a secret.
+        'picker_key' => env('GOOGLE_PICKER_KEY'),
+
+        // Picker also needs the Cloud project number, and renders a blank dialog
+        // with no error if it is missing. It is the numeric prefix of the OAuth
+        // client id, so it is derived rather than configured twice.
+        'picker_app_id' => env('GOOGLE_PICKER_APP_ID') ?: strtok((string) env('GOOGLE_CLIENT_ID'), '-'),
     ],
 
     'paystack' => [

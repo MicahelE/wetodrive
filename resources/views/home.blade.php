@@ -251,13 +251,34 @@
         .box-head .meta { font-size: .85rem; color: var(--muted); }
 
         label { display: block; font-size: .87rem; font-weight: 600; margin-bottom: 7px; }
-        input[type=url] {
+        label .opt { font-weight: 400; color: var(--muted); }
+        /* The folder field shares the URL field's styling; both are plain text boxes. */
+        input[type=url], input[type=text] {
             width: 100%; padding: 14px 15px; border-radius: var(--r-sm);
             border: 1px solid var(--line); font-size: 16px; font-family: inherit; color: var(--ink);
             background: var(--white); transition: border-color .18s, box-shadow .18s;
         }
-        input[type=url]::placeholder { color: #9AA3B8; }
-        input[type=url]:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(42,66,247,.15); }
+        input[type=url]::placeholder, input[type=text]::placeholder { color: #9AA3B8; }
+        input[type=url]:focus, input[type=text]:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(42,66,247,.15); }
+        #destination_folder { margin-bottom: 2px; }
+        label[for=destination_folder] { margin-top: 16px; }
+        .folder-row { display: flex; gap: 8px; align-items: stretch; }
+        .folder-row input[type=text] { flex: 1 1 auto; min-width: 0; }
+        .browse-btn {
+            flex: 0 0 auto; font: inherit; font-size: .9rem; font-weight: 600;
+            padding: 0 16px; border-radius: var(--r-sm); cursor: pointer;
+            background: var(--white); color: var(--blue); border: 1px solid var(--line);
+            transition: border-color .18s, background .18s;
+        }
+        .browse-btn:hover { border-color: var(--blue); background: rgba(42,66,247,.05); }
+        .browse-btn:disabled { opacity: .6; cursor: wait; }
+        @media (max-width: 520px) { .folder-row { flex-wrap: wrap; } .browse-btn { width: 100%; padding: 12px; } }
+        .folder-chip {
+            font: inherit; font-size: .82rem; color: var(--blue); background: rgba(42,66,247,.07);
+            border: 1px solid rgba(42,66,247,.18); border-radius: 999px; padding: 3px 10px;
+            margin: 0 4px 4px 0; cursor: pointer;
+        }
+        .folder-chip:hover { background: rgba(42,66,247,.13); }
         .submit-button {
             width: 100%; margin-top: 12px; padding: 15px; border-radius: var(--r-sm);
             background: var(--blue); color: #fff; border: 0; font-size: 1rem; font-weight: 650;
@@ -586,6 +607,39 @@
                                value="{{ old('wetransfer_url') }}"
                                placeholder="https://wetransfer.com/downloads/... or https://we.tl/t-...">
                         <div class="hint" id="urlHint">Works with full wetransfer.com links and short we.tl links.</div>
+
+                        <label for="destination_folder">Destination folder <span class="opt">optional</span></label>
+                        <div class="folder-row">
+                            <input type="text" id="destination_folder" name="destination_folder"
+                                   value="{{ old('destination_folder') }}"
+                                   placeholder="Clients/Acme"
+                                   list="folderSuggestions" autocomplete="off">
+                            @if(config('services.google.picker_key'))
+                                {{-- Carries the id of a folder chosen in Drive. Picking is
+                                     what grants this app access to a folder it did not
+                                     create, so the id matters, not the name. --}}
+                                <input type="hidden" id="destination_folder_id" name="destination_folder_id">
+                                <button type="button" id="browseDrive" class="browse-btn">Browse Drive</button>
+                            @endif
+                        </div>
+                        {{-- Only folders this app created, because the drive.file scope
+                             cannot see anything else in the user's Drive. --}}
+                        @if(!empty($recentFolders) && count($recentFolders))
+                            <datalist id="folderSuggestions">
+                                @foreach($recentFolders as $folder)
+                                    <option value="{{ $folder }}"></option>
+                                @endforeach
+                            </datalist>
+                            <div class="hint">
+                                Recent:
+                                @foreach($recentFolders as $folder)
+                                    <button type="button" class="folder-chip" data-folder="{{ $folder }}">{{ $folder }}</button>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="hint">Leave empty and files go straight to your Drive. Name a folder to sort them, and use / for subfolders.</div>
+                        @endif
+
                         <button type="submit" class="submit-button" id="transferButton">Transfer to Google Drive</button>
                     </form>
                 </div>

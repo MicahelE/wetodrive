@@ -86,6 +86,11 @@ class User extends Authenticatable
         return $this->hasMany(Transfer::class);
     }
 
+    public function driveFolders()
+    {
+        return $this->hasMany(DriveFolder::class);
+    }
+
     public function hasActiveSubscription(): bool
     {
         return $this->activeSubscription && $this->activeSubscription->isActive();

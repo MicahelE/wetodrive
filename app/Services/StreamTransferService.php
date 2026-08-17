@@ -19,7 +19,7 @@ class StreamTransferService
     private $progressCallback = null;
     protected const GOOGLE_MIN_CHUNK_SIZE = 262144; // 256KB minimum for Google Drive
 
-    public function __construct(int $chunkSize = null)
+    public function __construct(?int $chunkSize = null)
     {
         // Get chunk size from config or use 10MB default (10 * 1024 * 1024)
         if ($chunkSize === null) {
@@ -57,7 +57,7 @@ class StreamTransferService
     /**
      * Stream transfer directly from WeTransfer to Google Drive
      */
-    public function streamTransfer(string $downloadUrl, array $fileInfo, $user, string $transferId = null): string
+    public function streamTransfer(string $downloadUrl, array $fileInfo, $user, ?string $transferId = null, ?string $folderId = null): string
     {
         // Guarantee headroom for the chunk buffer + Google upload layer even
         // when invoked outside the controller entry point (FPM default is 128M,
@@ -74,7 +74,7 @@ class StreamTransferService
         $downloadStream = $this->getWeTransferStream($downloadUrl, $fileInfo);
 
         // Upload stream to Google Drive with progress tracking
-        $fileId = $this->streamToGoogleDrive($downloadStream, $fileInfo, $user, $transferId);
+        $fileId = $this->streamToGoogleDrive($downloadStream, $fileInfo, $user, $transferId, $folderId);
 
         Log::info('Streaming transfer completed', [
             'file_id' => $fileId,
@@ -217,37 +217,32 @@ class StreamTransferService
     }
 
     /**
-     * Get direct download link from WeTransfer page
+     * Open a session against a transfer's download page.
+     *
+     * WeTransfer's API wants the cookies and CSRF token the page hands out, so
+     * every API call starts here. Returns [client, headers, body, transferId,
+     * securityHash] where body already carries the security hash and, for
+     * recipient-scoped links, the recipient id that they 403 without.
      */
-    private function getDirectDownloadLink(string $pageUrl): string
+    private function apiSession(string $pageUrl): array
     {
-        Log::info('Getting direct download link', ['page_url' => $pageUrl]);
-
         [$transferId, $securityHash, $recipientId] = self::parseDownloadUrl($pageUrl);
 
-        $cookieJar = new CookieJar();
-
-        // Fetch the page to get CSRF token
         $client = new Client([
-            'cookies' => $cookieJar,
+            'cookies' => new CookieJar(),
             'headers' => [
                 'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
             ]
         ]);
 
-        $pageResponse = $client->get($pageUrl);
-        $html = $pageResponse->getBody()->getContents();
+        $html = $client->get($pageUrl)->getBody()->getContents();
 
-        // Extract CSRF token
         $csrfToken = null;
-        if (preg_match('/name="csrf-token" content="([^"]+)"/', $html, $csrfMatches)) {
-            $csrfToken = $csrfMatches[1];
-        } elseif (preg_match('/"csrf_token":"([^"]+)"/', $html, $csrfMatches)) {
-            $csrfToken = $csrfMatches[1];
+        if (preg_match('/name="csrf-token" content="([^"]+)"/', $html, $m)) {
+            $csrfToken = $m[1];
+        } elseif (preg_match('/"csrf_token":"([^"]+)"/', $html, $m)) {
+            $csrfToken = $m[1];
         }
-
-        // Make API request to get download link
-        $apiUrl = "https://wetransfer.com/api/v4/transfers/{$transferId}/download";
 
         $headers = [
             'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
@@ -257,75 +252,51 @@ class StreamTransferService
             'Referer' => $pageUrl
         ];
 
+        $body = ['security_hash' => $securityHash];
+
+        if ($recipientId) {
+            $body['recipient_id'] = $recipientId;
+        }
+
         if ($csrfToken) {
             $headers['X-CSRF-Token'] = $csrfToken;
+            $body['csrf_token'] = $csrfToken;
         }
 
-        $requestBody = [
-            'security_hash' => $securityHash,
-            'intent' => 'entire_transfer'
-        ];
+        return [$client, $headers, $body, $transferId, $securityHash];
+    }
 
-        // Recipient-scoped links 403 without this.
-        if ($recipientId) {
-            $requestBody['recipient_id'] = $recipientId;
-        }
-
-        if ($csrfToken) {
-            $requestBody['csrf_token'] = $csrfToken;
-        }
-
-        // WeTransfer occasionally returns transient 5xx / connection errors, so
-        // retry those with a short backoff. A 4xx (403 Forbidden / 404 / 410),
-        // however, means the link is expired, password-protected, or invalid —
-        // retrying never helps, so fail fast with the user-friendly signal.
+    /**
+     * POST to the WeTransfer API, retrying only what is worth retrying.
+     *
+     * WeTransfer returns transient 5xx and connection errors, so those get a
+     * short backoff. A 4xx means expired, password-protected or invalid, where
+     * retrying never helps — that fails fast with the WETRANSFER_EXPIRED: signal
+     * the controller turns into the "ask the sender for a new link" message.
+     */
+    private function postApi(Client $client, string $url, array $headers, array $body, string $what): array
+    {
         $maxAttempts = 3;
         $lastException = null;
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             try {
-                $apiResponse = $client->post($apiUrl, [
-                    'json' => $requestBody,
-                    'headers' => $headers
-                ]);
+                $response = $client->post($url, ['json' => $body, 'headers' => $headers]);
 
-                $responseData = json_decode($apiResponse->getBody()->getContents(), true);
-
-                // Check for download URL in response
-                $downloadUrl = $responseData['direct_link']
-                    ?? $responseData['download_url']
-                    ?? $responseData['fields']['download_url']
-                    ?? $responseData['presigned_url']
-                    ?? null;
-
-                if ($downloadUrl) {
-                    Log::info('Got direct download URL', ['url' => $downloadUrl]);
-                    return $downloadUrl;
-                }
-
-                // Fallback URL
-                $fallbackUrl = "https://download.wetransfer.com/eugv/{$transferId}/{$securityHash}";
-                Log::info('Using fallback URL', ['url' => $fallbackUrl]);
-
-                return $fallbackUrl;
-
+                return json_decode($response->getBody()->getContents(), true) ?? [];
             } catch (\Throwable $e) {
                 $lastException = $e;
                 $statusCode = ($e instanceof \GuzzleHttp\Exception\RequestException && $e->hasResponse())
                     ? $e->getResponse()->getStatusCode()
                     : 0;
 
-                // Client-side status (expired / forbidden / gone) — terminal.
                 if ($statusCode >= 400 && $statusCode < 500) {
-                    Log::warning('WeTransfer download link unavailable', [
-                        'status' => $statusCode,
-                        'transfer_id' => $transferId,
-                    ]);
+                    Log::warning('WeTransfer request unavailable', ['what' => $what, 'status' => $statusCode]);
                     throw new \Exception("WETRANSFER_EXPIRED:HTTP {$statusCode} from WeTransfer");
                 }
 
-                // Transient (network or 5xx) — back off and retry.
-                Log::warning('WeTransfer download request failed, retrying', [
+                Log::warning('WeTransfer request failed, retrying', [
+                    'what' => $what,
                     'attempt' => $attempt,
                     'status' => $statusCode,
                     'error' => $e->getMessage(),
@@ -337,9 +308,8 @@ class StreamTransferService
             }
         }
 
-        // Exhausted retries on transient errors.
         $errorMessage = $lastException?->getMessage() ?? 'unknown error';
-        Log::error('Failed to get direct download link', ['error' => $errorMessage]);
+        Log::error('WeTransfer request exhausted retries', ['what' => $what, 'error' => $errorMessage]);
 
         if (str_contains($errorMessage, 'No download access') ||
             str_contains($errorMessage, '404') ||
@@ -349,26 +319,183 @@ class StreamTransferService
             throw new \Exception('WETRANSFER_EXPIRED:' . $errorMessage);
         }
 
-        throw new \Exception('Failed to get download link from WeTransfer');
+        throw new \Exception('Failed to reach WeTransfer');
+    }
+
+    /**
+     * The individual files inside a transfer.
+     *
+     * Returns ['title' => string, 'size' => int, 'items' => [['id','name','size'], ...]]
+     * with items empty when the transfer cannot safely be taken apart, which
+     * tells the caller to fall back to downloading the whole archive.
+     *
+     * Anything that is not a plain file is that case: WeTransfer lets people
+     * upload whole folders, and those items do not have a single file behind
+     * them. Delivering the zip is always correct, so an unfamiliar shape
+     * degrades rather than fails.
+     */
+    public function listItems(string $pageUrl): array
+    {
+        [$client, $headers, $body, $transferId] = $this->apiSession($pageUrl);
+
+        $data = $this->postApi(
+            $client,
+            "https://wetransfer.com/api/v4/transfers/{$transferId}/prepare-download",
+            $headers,
+            $body,
+            'prepare-download',
+        );
+
+        return [
+            'title' => $data['display_name'] ?? $data['recommended_filename'] ?? 'WeTransfer files',
+            'size' => (int) ($data['size'] ?? 0),
+            'items' => self::filterItems($data['items'] ?? []),
+        ];
+    }
+
+    /**
+     * Keep the manifest only when every entry is a plain file we can fetch.
+     *
+     * Returning [] means "deliver the archive instead". All-or-nothing on
+     * purpose: importing half a transfer individually and silently dropping the
+     * rest would lose the user's files, so an unfamiliar shape falls back whole.
+     *
+     * Static and pure so the rule can be tested without going near the network.
+     */
+    public static function filterItems(array $rawItems): array
+    {
+        $items = [];
+
+        foreach ($rawItems as $item) {
+            if (($item['item_type'] ?? null) !== 'file' || empty($item['id']) || !isset($item['name'])) {
+                Log::info('Transfer contains a non-file item, falling back to the archive', [
+                    'item_type' => $item['item_type'] ?? null,
+                ]);
+
+                return [];
+            }
+
+            $items[] = [
+                'id' => $item['id'],
+                'name' => $item['name'],
+                'size' => (int) ($item['size'] ?? 0),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * A download link for one file inside a transfer, rather than the whole zip.
+     *
+     * This is what makes the delivered files usable: a zip in Drive cannot be
+     * previewed, opened or searched inside.
+     */
+    public function directLinkForItem(string $pageUrl, string $itemId): string
+    {
+        [$client, $headers, $body, $transferId] = $this->apiSession($pageUrl);
+
+        $data = $this->postApi(
+            $client,
+            "https://wetransfer.com/api/v4/transfers/{$transferId}/download",
+            $headers,
+            $body + ['intent' => 'single_file', 'file_ids' => [$itemId]],
+            'single-file download',
+        );
+
+        $link = $data['direct_link'] ?? $data['download_url'] ?? null;
+
+        if (!$link) {
+            throw new \Exception('WeTransfer returned no link for this file');
+        }
+
+        return $link;
+    }
+
+    /**
+     * Get direct download link from WeTransfer page
+     */
+    private function getDirectDownloadLink(string $pageUrl): string
+    {
+        Log::info('Getting direct download link', ['page_url' => $pageUrl]);
+
+        [$client, $headers, $body, $transferId, $securityHash] = $this->apiSession($pageUrl);
+
+        $responseData = $this->postApi(
+            $client,
+            "https://wetransfer.com/api/v4/transfers/{$transferId}/download",
+            $headers,
+            $body + ['intent' => 'entire_transfer'],
+            'entire-transfer download',
+        );
+
+        $downloadUrl = $responseData['direct_link']
+            ?? $responseData['download_url']
+            ?? $responseData['fields']['download_url']
+            ?? $responseData['presigned_url']
+            ?? null;
+
+        if ($downloadUrl) {
+            Log::info('Got direct download URL', ['url' => $downloadUrl]);
+            return $downloadUrl;
+        }
+
+        $fallbackUrl = "https://download.wetransfer.com/eugv/{$transferId}/{$securityHash}";
+        Log::info('Using fallback URL', ['url' => $fallbackUrl]);
+
+        return $fallbackUrl;
+    }
+
+    /**
+     * The /downloads/ page URL for a pasted link, short or long.
+     *
+     * listItems() and directLinkForItem() need the page URL rather than the
+     * signed file URL that parseWeTransferUrl() returns.
+     */
+    public function resolvePageUrl(string $url): string
+    {
+        if (preg_match('/we\.tl\/t-([a-zA-Z0-9]+)/', $url, $m)) {
+            $client = new Client([
+                'allow_redirects' => false,
+                'headers' => ['User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36']
+            ]);
+
+            $location = $client->get($url)->getHeader('Location')[0] ?? null;
+
+            if (!$location) {
+                throw new \Exception('Could not resolve short URL');
+            }
+
+            return self::normalizeDownloadUrl($location);
+        }
+
+        return self::normalizeDownloadUrl($url);
     }
 
     /**
      * Stream upload to Google Drive using resumable upload
      */
-    private function streamToGoogleDrive(StreamInterface $stream, array $fileInfo, $user, string $transferId = null): string
+    private function streamToGoogleDrive(StreamInterface $stream, array $fileInfo, $user, ?string $transferId = null, ?string $folderId = null): string
     {
         Log::info('Starting streaming upload to Google Drive', [
             'filename' => $fileInfo['filename'],
             'size' => $fileInfo['size'],
-            'transfer_id' => $transferId
+            'transfer_id' => $transferId,
+            'folder_id' => $folderId
         ]);
 
         $client = $this->getGoogleClient($user);
         $service = new Google_Service_Drive($client);
 
-        $fileMetadata = new Google_Service_Drive_DriveFile([
-            'name' => $fileInfo['filename']
-        ]);
+        $metadata = ['name' => $fileInfo['filename']];
+
+        // Omitted entirely rather than sent as null: Drive reads a missing
+        // parents key as "My Drive root", which is the pre-folder behaviour.
+        if ($folderId) {
+            $metadata['parents'] = [$folderId];
+        }
+
+        $fileMetadata = new Google_Service_Drive_DriveFile($metadata);
 
         // Enable deferred mode for resumable upload
         $client->setDefer(true);
@@ -547,7 +674,12 @@ class StreamTransferService
     /**
      * Get configured Google Client for user
      */
-    protected function getGoogleClient($user): Google_Client
+    /**
+     * Public because DriveFolderService needs the same authenticated client,
+     * refresh handling included, and a second copy of this would be a second
+     * place for token refresh to go wrong.
+     */
+    public function getGoogleClient($user): Google_Client
     {
         $client = new Google_Client();
 

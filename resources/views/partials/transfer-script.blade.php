@@ -225,6 +225,28 @@
                 console.error('[DEBUG] Transfer form not found!');
             }
 
+            // Recent-folder chips just fill the field; the form still submits it.
+            // Clearing the picked id matters: a chip means "resolve this by name",
+            // and a leftover id would send the file to the previous folder.
+            document.querySelectorAll('.folder-chip').forEach(function (chip) {
+                chip.addEventListener('click', function () {
+                    document.getElementById('destination_folder').value = chip.dataset.folder;
+                    const picked = document.getElementById('destination_folder_id');
+                    if (picked) picked.value = '';
+                });
+            });
+
+            // Typing a folder name also means "by name", not the folder last picked.
+            const folderField = document.getElementById('destination_folder');
+            if (folderField) {
+                folderField.addEventListener('input', function () {
+                    const picked = document.getElementById('destination_folder_id');
+                    if (picked) picked.value = '';
+                });
+            }
+
+            setUpDriveBrowser();
+
             // A transfer outlives the tab that started it, so if the server says
             // one is still running (or finished within the last 15 minutes), drop
             // straight back into the progress view instead of an empty form.
@@ -236,6 +258,79 @@
                 startProgressMonitoring(resumeId);
             }
         });
+
+        /**
+         * "Browse Drive" opens the Google Picker so the user can choose a folder
+         * they already have. The drive.file scope cannot list their Drive, so
+         * picking is the only way to reach a folder this app did not create, and
+         * the act of picking is what grants access to it.
+         *
+         * Google's api.js is ~100KB and is loaded on first click rather than on
+         * page load, so the homepage pays nothing for a feature most visitors
+         * never touch.
+         */
+        function setUpDriveBrowser() {
+            const button = document.getElementById('browseDrive');
+            if (!button) return; // no picker key configured
+
+            let gapiReady = null;
+
+            const loadGapi = () => gapiReady ??= new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://apis.google.com/js/api.js';
+                s.onload = () => gapi.load('picker', { callback: resolve, onerror: reject });
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+
+            button.addEventListener('click', async function () {
+                const original = button.textContent;
+                button.disabled = true;
+                button.textContent = 'Opening...';
+
+                try {
+                    const [config] = await Promise.all([
+                        fetch('{{ route('drive.picker-token') }}', { headers: { 'Accept': 'application/json' } })
+                            .then(r => r.ok ? r.json() : Promise.reject(new Error('token'))),
+                        loadGapi(),
+                    ]);
+
+                    const view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+                        .setIncludeFolders(true)
+                        .setSelectFolderEnabled(true)
+                        .setMimeTypes('application/vnd.google-apps.folder');
+
+                    new google.picker.PickerBuilder()
+                        .setTitle('Choose a destination folder')
+                        .setDeveloperKey(config.developer_key)
+                        // Without the project number the dialog renders blank, with
+                        // no error anywhere. Easily the most confusing way to get
+                        // this wrong, hence the note.
+                        .setAppId(config.app_id)
+                        .setOAuthToken(config.token)
+                        .addView(view)
+                        .setCallback(function (data) {
+                            if (data.action !== google.picker.Action.PICKED) return;
+
+                            const folder = data.docs[0];
+                            document.getElementById('destination_folder').value = folder.name;
+                            document.getElementById('destination_folder_id').value = folder.id;
+                        })
+                        .build()
+                        .setVisible(true);
+                } catch (e) {
+                    console.error('[DEBUG] Picker failed', e);
+                    // Typing a folder name still works, so this is a soft failure.
+                    const hint = document.createElement('div');
+                    hint.className = 'hint bad';
+                    hint.textContent = 'Could not open Google Drive. You can still type a folder name.';
+                    button.closest('.folder-row').after(hint);
+                } finally {
+                    button.disabled = false;
+                    button.textContent = original;
+                }
+            });
+        }
 
         // Whatever transfer this tab is currently watching, whether it started it
         // or reattached to it. resetTransferForm() needs it to mark the result seen.
@@ -292,12 +387,47 @@
                             document.getElementById('completionMessage').style.display = 'block';
 
                             // Build success message with Google Drive link
+                            const files = data.files || [];
+                            const many = files.length > 1;
+
                             let successHtml = `
                                 <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px;">
                                     <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Transfer Successful!</div>
-                                    <div style="margin-bottom: 10px;">Your file has been transferred to Google Drive.</div>`;
+                                    <div style="margin-bottom: 10px;">${
+                                        many
+                                            ? `${files.length} files have been transferred to Google Drive, each one on its own.`
+                                            : 'Your file has been transferred to Google Drive.'
+                                    }</div>`;
 
-                            if (data.google_drive_id) {
+                            // Individual files, so they can be opened directly rather
+                            // than dug out of a zip. Names are escaped: they come from
+                            // whoever made the transfer, not from us.
+                            if (many) {
+                                successHtml += '<ul style="margin: 0 0 12px; padding-left: 18px; line-height: 1.7;">';
+                                files.forEach(function (f) {
+                                    const name = document.createElement('span');
+                                    name.textContent = f.filename;
+                                    successHtml += `<li><a href="https://drive.google.com/file/d/${encodeURIComponent(f.google_drive_id)}/view" target="_blank" rel="noopener" style="color:#155724;">${name.innerHTML}</a></li>`;
+                                });
+                                successHtml += '</ul>';
+                            }
+
+                            if (data.failed && data.failed.length) {
+                                const failedNames = document.createElement('span');
+                                failedNames.textContent = data.failed.map(f => f.filename).join(', ');
+                                successHtml += `
+                                    <div style="background:#fff3cd; border:1px solid #ffc107; color:#856404; padding:10px; border-radius:6px; margin-bottom:12px;">
+                                        ${data.failed.length} file${data.failed.length > 1 ? 's' : ''} could not be transferred: ${failedNames.innerHTML}
+                                    </div>`;
+                            }
+
+                            if (data.folder_url) {
+                                successHtml += `
+                                    <a href="${data.folder_url}" target="_blank" rel="noopener"
+                                       style="display: inline-block; background: #4285f4; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-bottom: 10px;">
+                                        Open folder in Google Drive
+                                    </a><br>`;
+                            } else if (data.google_drive_id) {
                                 successHtml += `
                                     <a href="https://drive.google.com/file/d/${data.google_drive_id}/view" target="_blank"
                                        style="display: inline-block; background: #4285f4; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-bottom: 10px;">
@@ -474,9 +604,12 @@
             document.getElementById('bytesTransferred').textContent = bytesTransferred;
             document.getElementById('totalSize').textContent = totalBytes;
 
-            // Update filename
+            // Update filename, with the batch position when there is more than one.
             if (data.filename) {
-                document.getElementById('progressFilename').textContent = data.filename;
+                document.getElementById('progressFilename').textContent =
+                    (data.fileCount && data.fileCount > 1)
+                        ? `${data.filename}  ·  File ${data.fileIndex} of ${data.fileCount}`
+                        : data.filename;
             }
 
             // Update status. The server reports the two phases separately, so

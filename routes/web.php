@@ -23,6 +23,11 @@ Route::get('/unsubscribe/{user}', [UnsubscribeController::class, 'unsubscribe'])
     ->middleware('signed');
 Route::post('/transfer', [TransferController::class, 'transfer'])->name('transfer');
 
+// Hands the Google Picker a short-lived token for the signed-in user's own Drive.
+Route::get('/drive/picker-token', [TransferController::class, 'pickerToken'])
+    ->name('drive.picker-token')
+    ->middleware('auth');
+
 // Progress tracking for streaming transfers. Authed: the stream carries the
 // filename and byte counts, and the controller also checks the transfer is
 // actually this user's.
