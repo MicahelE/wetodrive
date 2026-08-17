@@ -166,6 +166,7 @@
             <thead>
                 <tr>
                     <th>Date</th>
+                    <th>File</th>
                     <th>File Size</th>
                 </tr>
             </thead>
@@ -173,6 +174,8 @@
                 @foreach($transfers as $transfer)
                 <tr>
                     <td>{{ $transfer->transferred_at->format('M j, Y H:i') }}</td>
+                    {{-- Transfers recorded before the filename column existed have none. --}}
+                    <td>{{ $transfer->filename ?? '—' }}</td>
                     <td>{{ $transfer->formatted_file_size }}</td>
                 </tr>
                 @endforeach

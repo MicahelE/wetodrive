@@ -266,8 +266,10 @@ class SubscriptionController extends Controller
         $activeSubscription = $user->activeSubscription;
         $subscriptionHistory = $user->subscriptions()->with('subscriptionPlan')->latest()->get();
         $paymentHistory = $user->paymentTransactions()->with('userSubscription.subscriptionPlan')->latest()->get();
+        // Same ordering and page size the admin view already uses for this list.
+        $transferHistory = $user->transfers()->orderBy('transferred_at', 'desc')->paginate(15);
 
-        return view('subscription.manage', compact('activeSubscription', 'subscriptionHistory', 'paymentHistory'));
+        return view('subscription.manage', compact('activeSubscription', 'subscriptionHistory', 'paymentHistory', 'transferHistory'));
     }
 
     public function cancel(Request $request)

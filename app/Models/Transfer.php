@@ -11,7 +11,9 @@ class Transfer extends Model
 
     protected $fillable = [
         'user_id',
+        'filename',
         'file_size',
+        'google_drive_id',
         'transferred_at',
     ];
 

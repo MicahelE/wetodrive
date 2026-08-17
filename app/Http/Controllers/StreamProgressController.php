@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -20,6 +21,14 @@ class StreamProgressController extends Controller
 
         if (!$transferId) {
             return response()->json(['error' => 'Transfer ID required'], 400);
+        }
+
+        // Transfer ids are guessable enough that this stream would otherwise hand
+        // out someone else's filename and byte counts. Checked once, here, rather
+        // than inside the loop: the pointer lives as long as the progress key, so
+        // a user returning to a just-finished transfer still passes.
+        if (Cache::get('active_transfer_' . Auth::id()) !== $transferId) {
+            return response()->json(['error' => 'Not your transfer'], 403);
         }
 
         $response = new StreamedResponse(function () use ($transferId) {
@@ -67,9 +76,10 @@ class StreamProgressController extends Controller
                             echo "data: " . json_encode($completeData) . "\n\n";
                             flush();
 
-                            // Clean up cache
-                            Cache::forget("transfer_progress_{$transferId}");
-                            Cache::forget("transfer_result_{$transferId}");
+                            // Deliberately not forgetting the keys here. Draining
+                            // the stream used to destroy the result, so a user who
+                            // closed the tab and came back saw nothing at all. The
+                            // 15 minute TTL cleans up instead.
                             break;
                         }
                     }
@@ -141,7 +151,25 @@ class StreamProgressController extends Controller
         if ($progress) {
             $progress['status'] = $success ? 'completed' : 'failed';
             $progress['percentage'] = $success ? 100 : $progress['percentage'];
-            Cache::put("transfer_progress_{$transferId}", $progress, 60); // Keep for 1 minute to ensure client gets it
+            // 15 minutes, not 1: long enough that someone who closed the tab
+            // mid-transfer still gets the result when they come back.
+            Cache::put("transfer_progress_{$transferId}", $progress, 900);
         }
+    }
+
+    /**
+     * The transfer this user currently has running, if any.
+     *
+     * The pointer alone is not enough — it can outlive the progress it points at
+     * — so the progress key is what actually decides. Returns null once there is
+     * nothing left to show, which is what keeps a stale id off the homepage.
+     */
+    public static function activeTransferFor(int $userId): ?string
+    {
+        $transferId = Cache::get("active_transfer_{$userId}");
+
+        return $transferId && Cache::has("transfer_progress_{$transferId}")
+            ? $transferId
+            : null;
     }
 }

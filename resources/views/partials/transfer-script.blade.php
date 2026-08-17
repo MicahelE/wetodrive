@@ -42,6 +42,7 @@
 
                     // Hide form, show progress
                     console.log('[DEBUG] Switching UI to progress view');
+                    startedHere = true; // the counts on this page predate this transfer
                     document.getElementById('transferFormContainer').style.display = 'none';
                     document.getElementById('progressContainer').style.display = 'block';
 
@@ -223,9 +224,30 @@
             } else {
                 console.error('[DEBUG] Transfer form not found!');
             }
+
+            // A transfer outlives the tab that started it, so if the server says
+            // one is still running (or finished within the last 15 minutes), drop
+            // straight back into the progress view instead of an empty form.
+            const resumeId = document.getElementById('progressContainer')?.dataset.resume;
+            if (resumeId && localStorage.getItem('wtd_seen_transfer') !== resumeId) {
+                console.log('[DEBUG] Reattaching to in-flight transfer:', resumeId);
+                document.getElementById('transferFormContainer').style.display = 'none';
+                document.getElementById('progressContainer').style.display = 'block';
+                startProgressMonitoring(resumeId);
+            }
         });
 
+        // Whatever transfer this tab is currently watching, whether it started it
+        // or reattached to it. resetTransferForm() needs it to mark the result seen.
+        let currentTransferId = null;
+
+        // False when we reattached to a transfer already in flight. The counts on
+        // the page were rendered by the server, so whether they already include
+        // this transfer depends on which of the two happened first.
+        let startedHere = false;
+
         function startProgressMonitoring(transferId) {
+            currentTransferId = transferId;
             let reconnectAttempts = 0;
             const maxReconnectAttempts = 10;
             const reconnectDelay = 2000; // 2 seconds
@@ -303,20 +325,25 @@
 
                             document.getElementById('completionMessage').innerHTML = successHtml;
 
-                            // Update transfer counts in UI
-                            const transfersRemainingEl = document.querySelector('[data-transfers-remaining]');
-                            if (transfersRemainingEl) {
-                                const current = parseInt(transfersRemainingEl.textContent);
-                                if (!isNaN(current) && current > 0) {
-                                    transfersRemainingEl.textContent = current - 1;
+                            // Nudge the counts, but only for a transfer this page
+                            // watched from the start. On a reattach the server has
+                            // already counted it, and adjusting again showed people
+                            // one fewer transfer than they actually had left.
+                            if (startedHere) {
+                                const transfersRemainingEl = document.querySelector('[data-transfers-remaining]');
+                                if (transfersRemainingEl) {
+                                    const current = parseInt(transfersRemainingEl.textContent);
+                                    if (!isNaN(current) && current > 0) {
+                                        transfersRemainingEl.textContent = current - 1;
+                                    }
                                 }
-                            }
 
-                            const totalTransfersEl = document.querySelector('[data-total-transfers]');
-                            if (totalTransfersEl) {
-                                const current = parseInt(totalTransfersEl.textContent);
-                                if (!isNaN(current)) {
-                                    totalTransfersEl.textContent = current + 1;
+                                const totalTransfersEl = document.querySelector('[data-total-transfers]');
+                                if (totalTransfersEl) {
+                                    const current = parseInt(totalTransfersEl.textContent);
+                                    if (!isNaN(current)) {
+                                        totalTransfersEl.textContent = current + 1;
+                                    }
                                 }
                             }
 
@@ -452,8 +479,14 @@
                 document.getElementById('progressFilename').textContent = data.filename;
             }
 
-            // Update status
-            if (data.status === 'transferring') {
+            // Update status. The server reports the two phases separately, so
+            // without these the heading sits on whatever it last said while the
+            // bar climbs, which reads as a stuck transfer.
+            if (data.status === 'downloading') {
+                document.getElementById('progressStatus').textContent = 'Downloading from WeTransfer...';
+            } else if (data.status === 'uploading') {
+                document.getElementById('progressStatus').textContent = 'Uploading to Google Drive...';
+            } else if (data.status === 'transferring') {
                 document.getElementById('progressStatus').textContent = 'Transferring to Google Drive...';
                 document.getElementById('statusMessage').innerHTML = '<span>⏳ Transfer in progress... Please wait.</span>';
             } else if (data.status === 'completed') {
@@ -463,22 +496,10 @@
                 document.getElementById('statusMessage').style.display = 'none';
                 document.getElementById('completionMessage').style.display = 'block';
 
-                // Increment transfer count in UI
-                const transfersRemainingEl = document.querySelector('[data-transfers-remaining]');
-                if (transfersRemainingEl) {
-                    const current = parseInt(transfersRemainingEl.textContent);
-                    if (!isNaN(current) && current > 0) {
-                        transfersRemainingEl.textContent = current - 1;
-                    }
-                }
-
-                const totalTransfersEl = document.querySelector('[data-total-transfers]');
-                if (totalTransfersEl) {
-                    const current = parseInt(totalTransfersEl.textContent);
-                    if (!isNaN(current)) {
-                        totalTransfersEl.textContent = current + 1;
-                    }
-                }
+                // The counters are deliberately NOT touched here. The stream sends
+                // a 'completed' message and then a 'complete' event for the same
+                // transfer, so doing it in both places counted every transfer twice
+                // and could show "0 left" to someone who still had one.
 
                 document.getElementById('completionMessage').innerHTML = `
                     <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px;">
@@ -514,6 +535,12 @@
         }
 
         function resetTransferForm() {
+            // Remember that this result has been seen, so reloading the page does
+            // not put the same success box back up for the rest of its 15 minutes.
+            if (currentTransferId) {
+                localStorage.setItem('wtd_seen_transfer', currentTransferId);
+            }
+
             // Reset form and UI
             document.getElementById('transferForm').reset();
             document.getElementById('transferFormContainer').style.display = 'block';

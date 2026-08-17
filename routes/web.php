@@ -23,8 +23,12 @@ Route::get('/unsubscribe/{user}', [UnsubscribeController::class, 'unsubscribe'])
     ->middleware('signed');
 Route::post('/transfer', [TransferController::class, 'transfer'])->name('transfer');
 
-// Progress tracking for streaming transfers
-Route::get('/transfer/progress', [StreamProgressController::class, 'streamProgress'])->name('transfer.progress');
+// Progress tracking for streaming transfers. Authed: the stream carries the
+// filename and byte counts, and the controller also checks the transfer is
+// actually this user's.
+Route::get('/transfer/progress', [StreamProgressController::class, 'streamProgress'])
+    ->name('transfer.progress')
+    ->middleware('auth');
 
 // SEO Landing Pages
 Route::get('/wetransfer-pricing', [SeoController::class, 'pricing'])->name('seo.pricing');

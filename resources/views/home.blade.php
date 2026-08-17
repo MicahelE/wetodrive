@@ -590,7 +590,9 @@
                     </form>
                 </div>
 
-                <div id="progressContainer" style="display:none;">
+                {{-- data-resume is set when this user already has a transfer running.
+                     The script reads it on load and reattaches to the live stream. --}}
+                <div id="progressContainer" style="display:none;" @if($activeTransfer) data-resume="{{ $activeTransfer }}" @endif>
                     <div style="text-align:center; margin-bottom:14px;">
                         <div style="font-weight:650;" id="progressStatus">Initializing transfer...</div>
                         <div style="color:var(--muted); font-size:.9rem;" id="progressFilename"></div>
@@ -603,7 +605,7 @@
                         <div class="pcell"><b id="totalSize">0 MB</b><span>Total size</span></div>
                     </div>
                     <div id="statusMessage" class="alert alert-success" style="text-align:center;">
-                        Transfer in progress. You can keep this tab open.
+                        Transfer in progress. You can close this tab, it keeps running and you can come back for the result.
                     </div>
                     <div id="completionMessage" style="display:none; margin-top:14px;"></div>
                 </div>

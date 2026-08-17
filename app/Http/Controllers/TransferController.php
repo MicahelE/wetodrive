@@ -55,7 +55,14 @@ class TransferController extends Controller
             $stats = ['accounts' => 0, 'transfers' => 0, 'bytes' => 0];
         }
 
-        return view('home', compact('stats'));
+        // A transfer keeps running after the tab closes (see transfer()), so a
+        // returning user gets handed the id back and the page reattaches to the
+        // live progress stream.
+        $activeTransfer = Auth::check()
+            ? StreamProgressController::activeTransferFor(Auth::id())
+            : null;
+
+        return view('home', compact('stats', 'activeTransfer'));
     }
 
     public function transfer(Request $request)
@@ -218,8 +225,12 @@ class TransferController extends Controller
                 );
             }
 
-            // Store transfer ID in session for progress tracking
-            session(['current_transfer_id' => $transferId]);
+            // The homepage reads this back to reattach its progress bar after a
+            // reload, so a user who closes the tab mid-transfer is not stranded.
+            // Cached rather than kept in the session so it survives on another
+            // device, and expires on its own.
+            // ponytail: one live transfer per user, which is all the UI supports.
+            Cache::put("active_transfer_{$user->id}", $transferId, 900);
 
             // For files < 1GB, use disk-based approach (more reliable)
             if ($fileInfo['size'] < 1024 * 1024 * 1024) {
@@ -321,7 +332,9 @@ class TransferController extends Controller
                     // Log the transfer with file size
                     Transfer::create([
                         'user_id' => $user->id,
+                        'filename' => $fileInfo['filename'],
                         'file_size' => $fileInfo['size'],
+                        'google_drive_id' => $googleDriveFileId,
                         'transferred_at' => now(),
                     ]);
 
@@ -421,7 +434,9 @@ class TransferController extends Controller
             // Log the transfer with file size
             Transfer::create([
                 'user_id' => $user->id,
+                'filename' => $fileInfo['filename'],
                 'file_size' => $fileInfo['size'],
+                'google_drive_id' => $googleDriveFileId,
                 'transferred_at' => now(),
             ]);
 
@@ -562,7 +577,9 @@ class TransferController extends Controller
                 // Log the transfer with file size
                 Transfer::create([
                     'user_id' => $user->id,
+                    'filename' => $fileInfo['filename'],
                     'file_size' => $fileInfo['size'],
+                    'google_drive_id' => $googleDriveFileId,
                     'transferred_at' => now(),
                 ]);
 
@@ -720,7 +737,9 @@ class TransferController extends Controller
             // Log the transfer with file size
             Transfer::create([
                 'user_id' => $user->id,
+                'filename' => $fileInfo['filename'],
                 'file_size' => $fileInfo['size'],
+                'google_drive_id' => $googleDriveFileId,
                 'transferred_at' => now(),
             ]);
 

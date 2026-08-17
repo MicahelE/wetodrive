@@ -485,6 +485,43 @@
             </div>
         @endif
 
+        <!-- Transfer History -->
+        @if($transferHistory->count() > 0)
+            <div class="card">
+                <h2>📁 Transfer History</h2>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>File</th>
+                            <th>Size</th>
+                            <th>Drive</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($transferHistory as $transfer)
+                            <tr>
+                                <td>{{ $transfer->transferred_at->format('M j, Y H:i') }}</td>
+                                {{-- Transfers from before these columns existed have neither. --}}
+                                <td>{{ $transfer->filename ?? '—' }}</td>
+                                <td>{{ $transfer->formatted_file_size }}</td>
+                                <td>
+                                    @if($transfer->google_drive_id)
+                                        <a href="https://drive.google.com/file/d/{{ $transfer->google_drive_id }}/view" target="_blank" rel="noopener">Open</a>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                <div style="margin-top: 15px;">
+                    {{ $transferHistory->links() }}
+                </div>
+            </div>
+        @endif
+
         <div style="text-align: center; margin-top: 40px;">
             <a href="{{ route('subscription.pricing') }}" class="btn btn-outline">View All Plans</a>
         </div>
