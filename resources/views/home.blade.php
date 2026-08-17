@@ -272,6 +272,16 @@
         }
         .browse-btn:hover { border-color: var(--blue); background: rgba(42,66,247,.05); }
         .browse-btn:disabled { opacity: .6; cursor: wait; }
+        /* Google positions its picker absolutely, at an offset worked out from the
+           document top. On a page this tall that can put the dialog far above the
+           viewport, so the user clicks Browse Drive and sees nothing at all.
+           Pinning it to the viewport makes it immune to the scroll position. */
+        .picker-dialog-bg { position: fixed !important; inset: 0 !important; height: 100% !important; }
+        .picker-dialog {
+            position: fixed !important; top: 50% !important; left: 50% !important;
+            transform: translate(-50%, -50%) !important; margin: 0 !important;
+            max-width: calc(100vw - 32px) !important; max-height: calc(100vh - 32px) !important;
+        }
         @media (max-width: 520px) { .folder-row { flex-wrap: wrap; } .browse-btn { width: 100%; padding: 12px; } }
         .folder-chip {
             font: inherit; font-size: .82rem; color: var(--blue); background: rgba(42,66,247,.07);
