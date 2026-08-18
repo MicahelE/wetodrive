@@ -12,14 +12,13 @@ use Illuminate\Support\Facades\Mail;
 /**
  * Announces per-file delivery and destination folders.
  *
- * Sent in batches on purpose: the per-file path is new, and putting 484 people
- * onto it at once would turn a small bug into a lot of failed transfers. Run it
- * with --limit for the first batch, then again with no limit a day later once
- * the first batch has been watched.
+ * Sent in batches on purpose, for two reasons: the per-file path is new, and
+ * Resend has a daily quota that a large run will hit partway through. Small runs
+ * keep both problems small.
  *
- *   php artisan users:announce-features --limit=242 --dry-run
- *   php artisan users:announce-features --limit=242
- *   php artisan users:announce-features            # the rest, 24h later
+ *   php artisan users:announce-features --dry-run   # the next 50
+ *   php artisan users:announce-features             # send them
+ *   php artisan users:announce-features --limit=0   # everyone left, quota permitting
  *
  * feature_email_sent is what makes the second run the exact complement of the
  * first, and what stops a re-run emailing anyone twice.
@@ -27,7 +26,7 @@ use Illuminate\Support\Facades\Mail;
 class SendFeatureAnnouncement extends Command
 {
     protected $signature = 'users:announce-features
-        {--limit= : Only email this many (oldest accounts first). Omit to email everyone left.}
+        {--limit=50 : How many to email this run, oldest accounts first. Use --limit=0 for everyone left.}
         {--dry-run : List the recipients without sending anything}';
 
     protected $description = 'Email users about per-file delivery and destination folders.';
@@ -36,8 +35,10 @@ class SendFeatureAnnouncement extends Command
     {
         $query = $this->eligible()->orderBy('id');
 
-        if ($limit = $this->option('limit')) {
-            $query->limit((int) $limit);
+        // Defaults to 50 a run. Resend's daily quota stopped a 242 batch at 199,
+        // and a batch that dies halfway is worse than several that fit.
+        if (($limit = (int) $this->option('limit')) > 0) {
+            $query->limit($limit);
         }
 
         $users = $query->get();

@@ -36,7 +36,7 @@ class FeatureAnnouncementTest extends TestCase
         $this->artisan('users:announce-features', ['--limit' => 4]);
         $firstBatch = User::where('feature_email_sent', true)->pluck('id');
 
-        $this->artisan('users:announce-features');
+        $this->artisan('users:announce-features', ['--limit' => 0]);
 
         Mail::assertSent(FeatureAnnouncementMail::class, 10);
         $this->assertSame(10, User::where('feature_email_sent', true)->count());
@@ -49,9 +49,9 @@ class FeatureAnnouncementTest extends TestCase
         Mail::fake();
         User::factory()->count(3)->create();
 
-        $this->artisan('users:announce-features');
+        $this->artisan('users:announce-features', ['--limit' => 0]);
         Mail::fake(); // reset the recorder
-        $this->artisan('users:announce-features');
+        $this->artisan('users:announce-features', ['--limit' => 0]);
 
         Mail::assertNothingSent();
     }
@@ -63,10 +63,23 @@ class FeatureAnnouncementTest extends TestCase
         User::factory()->create(['role' => 'admin']);
         $ok = User::factory()->create(['role' => 'user', 'email_opt_out' => false]);
 
-        $this->artisan('users:announce-features');
+        $this->artisan('users:announce-features', ['--limit' => 0]);
 
         Mail::assertSent(FeatureAnnouncementMail::class, 1);
         Mail::assertSent(FeatureAnnouncementMail::class, fn ($m) => $m->user->is($ok));
+    }
+
+    public function test_it_defaults_to_fifty_a_run(): void
+    {
+        // Resend's daily quota killed a 242 batch at 199, so a bare run is
+        // deliberately small rather than "everyone".
+        Mail::fake();
+        User::factory()->count(60)->create();
+
+        $this->artisan('users:announce-features')->assertSuccessful();
+
+        Mail::assertSent(FeatureAnnouncementMail::class, 50);
+        $this->assertSame(10, User::where('feature_email_sent', false)->where('role', '!=', 'admin')->count());
     }
 
     public function test_a_dry_run_sends_nothing_and_marks_nobody(): void
