@@ -21,14 +21,14 @@ class DriveFolderTest extends TestCase
      * A stand-in for Google_Service_Drive->files, recording what it was asked to
      * create and pretending anything it created still exists.
      */
-    private function fakeDrive(array $missing = [], string $prefix = 'folder-'): object
+    private function fakeDrive(array $missing = [], string $prefix = 'folder-', array $readOnly = []): object
     {
-        return new class($missing, $prefix) {
+        return new class($missing, $prefix, $readOnly) {
             public array $created = [];
             public array $checked = [];
             private int $n = 0;
 
-            public function __construct(private array $missing, private string $prefix) {}
+            public function __construct(private array $missing, private string $prefix, private array $readOnly = []) {}
 
             public function get($id, $opts = [])
             {
@@ -38,8 +38,17 @@ class DriveFolderTest extends TestCase
                     throw new \Google\Service\Exception('File not found', 404);
                 }
 
-                return new class {
+                $writable = !in_array($id, $this->readOnly, true);
+
+                return new class($writable) {
+                    public function __construct(private bool $writable) {}
                     public function getTrashed() { return false; }
+                    public function getCapabilities() {
+                        return new class($this->writable) {
+                            public function __construct(private bool $writable) {}
+                            public function getCanAddChildren() { return $this->writable; }
+                        };
+                    }
                 };
             }
 
@@ -280,6 +289,24 @@ class DriveFolderTest extends TestCase
 
         $this->assertSame($a, $b);
         $this->assertCount(1, $files->created);
+    }
+
+    public function test_it_reports_a_read_only_shared_folder_as_not_writable(): void
+    {
+        // The Picker lists folders shared read-only, and picking one is allowed.
+        // Uploading into it fails on every file, so this is caught up front.
+        $files = $this->fakeDrive(readOnly: ['shared-ro']);
+
+        $this->assertFalse($this->serviceWith($files)->canAddFilesTo('shared-ro'));
+        $this->assertTrue($this->serviceWith($files)->canAddFilesTo('mine'));
+    }
+
+    public function test_an_unreadable_folder_counts_as_not_writable(): void
+    {
+        // Better to refuse than to start a multi-gigabyte transfer on a guess.
+        $files = $this->fakeDrive(missing: ['gone']);
+
+        $this->assertFalse($this->serviceWith($files)->canAddFilesTo('gone'));
     }
 
     public function test_a_bad_folder_path_is_rejected_before_anything_transfers(): void

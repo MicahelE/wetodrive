@@ -466,10 +466,30 @@ class StreamTransferService
                 throw new \Exception('Could not resolve short URL');
             }
 
-            return self::normalizeDownloadUrl($location);
+            return self::assertDownloadable(self::normalizeDownloadUrl($location));
         }
 
         return self::normalizeDownloadUrl($url);
+    }
+
+    /**
+     * A short link that no longer points at a transfer is expired, not malformed.
+     *
+     * WeTransfer answers a dead we.tl link with a redirect to
+     * /redirect/error rather than an error status, and the caller then reported
+     * "Invalid WeTransfer URL format" — which reads as though the user pasted
+     * something wrong, when in fact the link is gone. This maps it onto the
+     * expired signal, so they get told to ask the sender for a new link.
+     */
+    private static function assertDownloadable(string $resolved): string
+    {
+        if (!preg_match('#wetransfer\.com/downloads/#', $resolved)) {
+            Log::warning('Short link no longer points at a transfer', ['resolved' => $resolved]);
+
+            throw new \Exception('WETRANSFER_EXPIRED:short link resolved to ' . $resolved);
+        }
+
+        return $resolved;
     }
 
     /**

@@ -179,6 +179,26 @@ class TransferController extends Controller
                 $folderLabel = DriveFolderService::normalizePath($request->input('destination_folder'));
                 $folderId = DriveFolderService::for($user)->resolve($user, $folderLabel);
             }
+
+            // Confirm we can actually write there before a single byte moves. The
+            // Picker offers read-only shared folders too, and without this the
+            // whole transfer downloads and then fails on every file.
+            if ($folderId && !DriveFolderService::for($user)->canAddFilesTo($folderId)) {
+                $message = 'You do not have permission to add files to that folder. '
+                    . 'Pick a folder you own, or ask its owner for edit access.';
+
+                Log::warning('Destination folder is not writable', [
+                    'user_id' => $user->id,
+                    'folder_id' => $folderId,
+                    'folder' => $folderLabel,
+                ]);
+
+                if ($request->ajax()) {
+                    return response()->json(['success' => false, 'error' => $message], 403);
+                }
+
+                return redirect()->back()->with('error', $message);
+            }
         } catch (\InvalidArgumentException $e) {
             if ($request->ajax()) {
                 return response()->json(['success' => false, 'error' => $e->getMessage()], 422);

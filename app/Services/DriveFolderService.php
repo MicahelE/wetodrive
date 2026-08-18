@@ -201,6 +201,31 @@ class DriveFolderService
         return $folderId;
     }
 
+    /**
+     * Can this user actually put files into that folder?
+     *
+     * The Picker lists everything under "Shared with me", including folders the
+     * user can only read, and picking one is allowed. Uploading into it then
+     * fails with insufficientParentPermissions on every single file. One user
+     * lost a 311 file, 2.9GB transfer that way before this check existed, so the
+     * destination is confirmed writable before anything is downloaded.
+     */
+    public function canAddFilesTo(string $folderId): bool
+    {
+        try {
+            $folder = $this->drive->files->get($folderId, ['fields' => 'capabilities(canAddChildren)']);
+
+            return (bool) $folder->getCapabilities()->getCanAddChildren();
+        } catch (\Throwable $e) {
+            Log::warning('Could not read folder capabilities', [
+                'folder_id' => $folderId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
     /** False when the folder is gone or in the bin, which are the same to us. */
     private function stillExists(string $folderId): bool
     {
