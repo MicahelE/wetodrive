@@ -34,6 +34,7 @@ class User extends Authenticatable
         'check_in_email_sent',
         'email_opt_out',
         'winback_email_sent',
+        'feature_email_sent',
     ];
 
     /**
@@ -63,6 +64,7 @@ class User extends Authenticatable
             'check_in_email_sent' => 'boolean',
             'email_opt_out' => 'boolean',
             'winback_email_sent' => 'boolean',
+            'feature_email_sent' => 'boolean',
         ];
     }
 
