@@ -18,6 +18,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('subscriptions:notify-expiring --days=3')->dailyAt('09:00');
         $schedule->command('subscriptions:expire')->dailyAt('09:05');
         $schedule->command('emails:send-check-ins')->dailyAt('10:00');
+
+        // Drip the features announcement out at 50 a day. Small batches because
+        // Resend's daily quota stopped a 242 batch at 199, and because the
+        // per-file path is new enough that a slow ramp is worth the patience.
+        //
+        // Self-limiting: once everyone eligible has had it the command finds
+        // nobody and exits without sending, so this can safely stay put.
+        $schedule->command('users:announce-features')->dailyAt('11:00');
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
