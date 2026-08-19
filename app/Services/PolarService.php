@@ -128,7 +128,7 @@ class PolarService
             $mutatingEvents = [
                 'subscription.created', 'subscription.active', 'subscription.updated',
                 'subscription.canceled', 'subscription.cancelled', 'subscription.revoked',
-                'order.created', 'order.paid', 'order.updated',
+                'order.created', 'order.paid', 'order.updated', 'order.refunded',
             ];
 
             if (in_array($eventName, $mutatingEvents, true) && !$this->eventBelongsToWeToDrive($eventData)) {
@@ -160,6 +160,9 @@ class PolarService
                 case 'order.paid':
                 case 'order.updated':
                     return $this->handleOrderPaid($eventData);
+
+                case 'order.refunded':
+                    return $this->handleOrderRefunded($eventData);
 
                 default:
                     Log::info('Polar webhook event not handled', ['event' => $eventName]);
@@ -340,6 +343,78 @@ class PolarService
         }
 
         return true;
+    }
+
+    /**
+     * A refunded order should take the subscription with it.
+     *
+     * Refunding in Polar only touches the order: the subscription carries on,
+     * so the customer keeps their plan after getting their money back. That
+     * happened once already (a Premium customer stayed Premium for the seven
+     * weeks left on his period), and the refund webhooks were arriving here and
+     * falling through to the default branch the whole time.
+     *
+     * This revokes in Polar rather than downgrading locally, which matters:
+     * polar:reconcile mirrors Polar every morning, so a local-only downgrade is
+     * undone by 08:55 the next day. Revoking makes Polar fire
+     * subscription.revoked, and handleSubscriptionRevoked does the downgrade.
+     * Polar stays the single source of truth and reconcile agrees with us.
+     */
+    private function handleOrderRefunded(array $data): bool
+    {
+        $orderId = $data['id'] ?? null;
+        $total = (int) ($data['total_amount'] ?? 0);
+        $refunded = (int) ($data['refunded_amount'] ?? 0);
+        $polarSubscriptionId = $data['subscription_id'] ?? null;
+
+        // Mark the money back regardless of whether the plan changes, so the
+        // revenue figures do not keep counting a refunded order.
+        if ($orderId) {
+            PaymentTransaction::where('provider', 'polar')
+                ->where('provider_reference', 'polar_order_' . $orderId)
+                ->update(['status' => 'refunded']);
+        }
+
+        // A partial refund is a goodwill gesture, not a cancellation, so it must
+        // not take the plan away. Only a full refund does.
+        if ($total <= 0 || $refunded < $total) {
+            Log::info('Polar partial refund, subscription left alone', [
+                'order_id' => $orderId,
+                'refunded' => $refunded,
+                'total' => $total,
+            ]);
+            return true;
+        }
+
+        if (!$polarSubscriptionId) {
+            Log::info('Polar refund was not for a subscription order', ['order_id' => $orderId]);
+            return true;
+        }
+
+        $subscription = UserSubscription::where('payment_provider', 'polar')
+            ->where('provider_subscription_id', $polarSubscriptionId)
+            ->first();
+
+        if (!$subscription) {
+            Log::warning('Polar refund for an unknown subscription', [
+                'order_id' => $orderId,
+                'polar_subscription_id' => $polarSubscriptionId,
+            ]);
+            return true;
+        }
+
+        // Already finished: nothing to revoke, and revoking again would 4xx.
+        if (!in_array($subscription->status, ['active', 'cancelled'], true)) {
+            return true;
+        }
+
+        Log::info('Polar order fully refunded, revoking subscription', [
+            'order_id' => $orderId,
+            'subscription_id' => $subscription->id,
+            'user_id' => $subscription->user_id,
+        ]);
+
+        return $this->revokeSubscription($subscription);
     }
 
     private function handleOrderPaid(array $data): bool
@@ -652,9 +727,11 @@ class PolarService
     }
 
     /**
-     * Terminate a Polar subscription immediately. Used when an account is being
-     * deleted: unlike cancelSubscription() (cancel at period end), this stops the
-     * subscription now so nothing keeps billing against a deleted account.
+     * Terminate a Polar subscription immediately.
+     *
+     * Unlike cancelSubscription() (cancel at period end), this ends it now. Used
+     * where continued access would be wrong rather than merely unwanted: a fully
+     * refunded order, or an account being deleted.
      */
     public function revokeSubscription(UserSubscription $subscription): bool
     {
@@ -665,7 +742,7 @@ class PolarService
         try {
             $this->client()->subscriptions->revoke($subscription->provider_subscription_id);
 
-            Log::info('Polar subscription revoked (account deletion)', [
+            Log::info('Polar subscription revoked', [
                 'subscription_id' => $subscription->id,
                 'polar_id' => $subscription->provider_subscription_id,
             ]);
