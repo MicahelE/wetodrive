@@ -33,7 +33,17 @@ class Transfer extends Model
 
     public function getFormattedFileSizeAttribute(): string
     {
-        $bytes = $this->file_size;
+        return self::formatSize($this->file_size);
+    }
+
+    /**
+     * Static so a batch total can be formatted the same way as a single file.
+     * The admin history groups a multi-file transfer into one row, and that
+     * row's size is a SUM rather than any one model's file_size.
+     */
+    public static function formatSize(?int $bytes): string
+    {
+        $bytes = (int) $bytes;
 
         if ($bytes >= 1024 * 1024 * 1024) {
             return round($bytes / (1024 * 1024 * 1024), 2) . ' GB';

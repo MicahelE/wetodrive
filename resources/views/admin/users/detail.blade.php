@@ -166,18 +166,56 @@
             <thead>
                 <tr>
                     <th>Date</th>
-                    <th>File</th>
-                    <th>File Size</th>
+                    <th>Files</th>
+                    <th>Total Size</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach($transfers as $transfer)
-                <tr>
-                    <td>{{ $transfer->transferred_at->format('M j, Y H:i') }}</td>
-                    {{-- Transfers recorded before the filename column existed have none. --}}
-                    <td>{{ $transfer->filename ?? '—' }}</td>
-                    <td>{{ $transfer->formatted_file_size }}</td>
-                </tr>
+                @foreach($transfers as $group)
+                    @php
+                        // Files from one WeTransfer link were imported together and
+                        // share a batch_id. Anything else is a row on its own.
+                        $files = $group->batch_id ? ($batchFiles[$group->batch_id] ?? collect()) : collect();
+                        $many = $group->file_count > 1;
+                    @endphp
+                    <tr>
+                        <td style="white-space: nowrap; vertical-align: top;">
+                            {{ \Carbon\Carbon::parse($group->transferred_at)->format('M j, Y H:i') }}
+                        </td>
+                        <td>
+                            @if($many)
+                                {{-- Native disclosure: no JS to keep working. --}}
+                                <details>
+                                    <summary style="cursor: pointer;">
+                                        <strong>{{ $group->file_count }} files</strong>
+                                        <span style="color: #6b7280;">from one transfer</span>
+                                    </summary>
+                                    <ul style="margin: 10px 0 4px; padding-left: 20px; line-height: 1.7;">
+                                        @foreach($files as $file)
+                                            <li>
+                                                {{ $file->filename ?? '—' }}
+                                                <span style="color: #6b7280;">({{ $file->formatted_file_size }})</span>
+                                                @if($file->google_drive_id)
+                                                    <a href="https://drive.google.com/file/d/{{ $file->google_drive_id }}/view"
+                                                       target="_blank" rel="noopener">open</a>
+                                                @endif
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </details>
+                            @else
+                                {{-- Transfers recorded before the filename column existed have none. --}}
+                                {{ $group->first_filename ?? '—' }}
+                                @if($group->google_drive_id)
+                                    <a href="https://drive.google.com/file/d/{{ $group->google_drive_id }}/view"
+                                       target="_blank" rel="noopener">open</a>
+                                @endif
+                            @endif
+                        </td>
+                        <td style="white-space: nowrap; vertical-align: top;">
+                            {{ \App\Models\Transfer::formatSize($group->total_size) }}
+                        </td>
+                    </tr>
                 @endforeach
             </tbody>
         </table>

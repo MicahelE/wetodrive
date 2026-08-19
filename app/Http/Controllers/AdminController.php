@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\UserSubscription;
 use App\Models\PaymentTransaction;
 use App\Models\SubscriptionPlan;
+use App\Models\Transfer;
 use App\Services\PolarService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -85,11 +86,33 @@ class AdminController extends Controller
             'activeSubscription.subscriptionPlan'
         ]);
 
+        // One row per WeTransfer link rather than per file. Files imported from
+        // one link share a batch_id; single-file and pre-batch rows have none, so
+        // they fall back to their own id and group alone.
+        //
+        // COALESCE rather than anything cleverer because this runs on MySQL in
+        // production and SQLite in the tests.
         $transfers = $user->transfers()
-            ->orderBy('transferred_at', 'desc')
+            ->selectRaw('COALESCE(batch_id, id) as group_key')
+            ->selectRaw('MAX(batch_id) as batch_id')
+            ->selectRaw('COUNT(*) as file_count')
+            ->selectRaw('SUM(file_size) as total_size')
+            ->selectRaw('MAX(transferred_at) as transferred_at')
+            ->selectRaw('MIN(filename) as first_filename')
+            ->selectRaw('MAX(google_drive_id) as google_drive_id')
+            ->groupBy('group_key')
+            ->orderByRaw('MAX(transferred_at) DESC')
             ->paginate(15);
 
-        return view('admin.users.detail', compact('user', 'transfers'));
+        // The files inside the multi-file batches on this page, in one query
+        // rather than one per expanded row.
+        $batchFiles = Transfer::query()
+            ->whereIn('batch_id', $transfers->pluck('batch_id')->filter()->all())
+            ->orderBy('filename')
+            ->get()
+            ->groupBy('batch_id');
+
+        return view('admin.users.detail', compact('user', 'transfers', 'batchFiles'));
     }
 
     public function makeAdmin(Request $request, User $user)
