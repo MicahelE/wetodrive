@@ -19,13 +19,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('subscriptions:expire')->dailyAt('09:05');
         $schedule->command('emails:send-check-ins')->dailyAt('10:00');
 
-        // Drip the features announcement out at 50 a day. Small batches because
-        // Resend's daily quota stopped a 242 batch at 199, and because the
-        // per-file path is new enough that a slow ramp is worth the patience.
-        //
-        // Self-limiting: once everyone eligible has had it the command finds
-        // nobody and exits without sending, so this can safely stay put.
-        $schedule->command('users:announce-features')->dailyAt('11:00');
+        // Features announcement drip: paused 2026-08-27, backlog done (521 sent,
+        // 0 eligible left). Left off because feature_email_sent defaults to false,
+        // so new signups would otherwise get an announcement about a feature that
+        // was already there when they joined. Re-enable only for a new announcement.
+        // $schedule->command('users:announce-features')->dailyAt('11:00');
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
