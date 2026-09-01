@@ -140,6 +140,29 @@ class TransferController extends Controller
         $user = Auth::user();
         $useStreaming = $request->get('use_streaming', true); // Default to streaming
 
+        // One transfer at a time. A 3GB batch is 100+ files and runs the best
+        // part of an hour, so people resubmit the link or reload the tab; every
+        // one of those re-downloads the whole transfer and uploads it again.
+        // #518 ran the same 2.97GB link four times over, paying the egress four
+        // times to deliver it once. Refused here, before anything is fetched.
+        // ponytail: the pointer is only set once the size check passes, so two
+        // submissions seconds apart can still both get through. Every duplicate
+        // seen in production was minutes apart, so this covers them; seed the
+        // progress entry at the guard if the narrow race ever shows up.
+        if (StreamProgressController::activeTransferFor($user->id)) {
+            Log::info('Duplicate transfer refused, one already running', [
+                'user_id' => $user->id,
+            ]);
+
+            $busy = 'You already have a transfer running. Wait for it to finish, then start the next one.';
+
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'error' => $busy], 409);
+            }
+
+            return redirect()->back()->with('error', $busy);
+        }
+
         // Check subscription limits
         if (!$this->checkTransferLimits($user)) {
             Log::warning('Transfer attempted but user exceeded limits', [
@@ -1777,6 +1800,13 @@ class TransferController extends Controller
             $plan = $this->recommendPlanFor($fileInfo['size']);
             if (! $plan) {
                 return; // bigger than every plan — nothing to upsell (admin alert covers this)
+            }
+
+            // Belt and braces with the duplicate guard above: never let an
+            // upgrade pitch land while a transfer is running, because read mid
+            // upload it looks like that transfer failed.
+            if (StreamProgressController::activeTransferFor($user->id)) {
+                return;
             }
 
             // ponytail: shared cooldown with the batch backlog send, so retries
