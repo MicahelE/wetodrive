@@ -21,6 +21,10 @@ class OversizeTransferAlertTest extends TestCase
 
     private function plans(): void
     {
+        // Migrations seed the real ladder (Ultra included); these tests assert
+        // against their own, so start from an empty table.
+        SubscriptionPlan::query()->delete();
+
         SubscriptionPlan::create([
             'name' => 'Free', 'slug' => 'free', 'price_ngn' => 0, 'price_usd' => 0,
             'transfer_limit' => 5, 'max_file_size' => 100 * 1024 * 1024,

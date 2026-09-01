@@ -599,7 +599,7 @@
                     <span>+</span>
                 </div>
                 <div class="faq-answer">
-                    <p>File size limits depend on your plan: Free users can transfer files up to 100MB, Pro users up to 25GB, and Premium users up to 500GB per file. There are also monthly transfer limits: 5 for Free, 100 for Pro, and unlimited for Premium users.</p>
+                    <p>File size limits depend on your plan: Free users can transfer files up to 100MB, Pro users up to 25GB, Premium users up to 500GB, and Ultra users up to 1TB per file. There are also monthly transfer limits: 5 for Free, 100 for Pro, and unlimited for Premium and Ultra users.</p>
                 </div>
             </div>
 

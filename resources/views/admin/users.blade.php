@@ -18,6 +18,7 @@
                 <option value="free" {{ request('subscription_tier') === 'free' ? 'selected' : '' }}>Free</option>
                 <option value="pro" {{ request('subscription_tier') === 'pro' ? 'selected' : '' }}>Pro</option>
                 <option value="premium" {{ request('subscription_tier') === 'premium' ? 'selected' : '' }}>Premium</option>
+                <option value="ultra" {{ request('subscription_tier') === 'ultra' ? 'selected' : '' }}>Ultra</option>
             </select>
             <button type="submit" class="btn btn-primary">Filter</button>
         </form>

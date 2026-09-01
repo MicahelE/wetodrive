@@ -72,6 +72,28 @@ class SubscriptionPlanSeeder extends Seeder
                 'sort_order' => 3,
                 'created_at' => now(),
                 'updated_at' => now()
+            ],
+            [
+                'name' => 'Ultra',
+                'slug' => 'ultra',
+                'price_ngn' => 75000,
+                'price_usd' => 120,
+                'transfer_limit' => null, // unlimited
+                'max_file_size' => 1024 * 1024 * 1024 * 1024, // 1TB
+                'features' => json_encode([
+                    'Unlimited transfers',
+                    '1TB file size limit',
+                    'Priority transfer queue',
+                    'Bulk transfer support',
+                    'API access',
+                    'Dedicated support',
+                    'Advanced analytics',
+                    'Transfer history forever'
+                ]),
+                'is_active' => true,
+                'sort_order' => 4,
+                'created_at' => now(),
+                'updated_at' => now()
             ]
         ]);
     }

@@ -344,7 +344,7 @@
                                 <li>Files up to 100MB each</li>
                                 <li>No credit card required</li>
                             </ul>
-                            <p>For more transfers and larger files, check out our Pro and Premium plans.</p>
+                            <p>For more transfers and larger files, check out our Pro, Premium and Ultra plans.</p>
                         </div>
                     </div>
                 </div>
@@ -361,7 +361,7 @@
                             <p>To upgrade your subscription:</p>
                             <ul>
                                 <li>Go to the <a href="{{ route('subscription.pricing') }}">Pricing</a> page</li>
-                                <li>Choose your desired plan (Pro or Premium)</li>
+                                <li>Choose your desired plan (Pro, Premium or Ultra)</li>
                                 <li>Click "Subscribe" and complete the payment</li>
                                 <li>Your new limits will be activated immediately</li>
                             </ul>
@@ -442,6 +442,7 @@
                                 <li><strong>Free:</strong> 100MB per file</li>
                                 <li><strong>Pro:</strong> 25GB per file</li>
                                 <li><strong>Premium:</strong> 500GB per file</li>
+                                <li><strong>Ultra:</strong> 1TB per file</li>
                             </ul>
                             <p>To transfer larger files, consider upgrading your plan.</p>
                         </div>

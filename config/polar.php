@@ -56,6 +56,7 @@ return [
     'product_ids' => [
         'pro' => env('POLAR_PRODUCT_ID_PRO'),
         'premium' => env('POLAR_PRODUCT_ID_PREMIUM'),
+        'ultra' => env('POLAR_PRODUCT_ID_ULTRA'),
     ],
 
 ];

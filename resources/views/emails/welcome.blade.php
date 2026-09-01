@@ -13,7 +13,7 @@ Ready to get started? Just paste a WeTransfer link and we'll handle the rest.
 Start Transferring
 </x-mail::button>
 
-Need more transfers or larger files? Check out our Pro and Premium plans.
+Need more transfers or larger files? Check out our Pro, Premium and Ultra plans.
 
 Thanks,<br>
 {{ config('app.name') }}

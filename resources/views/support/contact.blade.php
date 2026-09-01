@@ -343,7 +343,7 @@
                     <li>Describe the issue you're experiencing in detail</li>
                     <li>Provide the WeTransfer URL if transfer-related</li>
                     <li>Mention any error messages you received</li>
-                    <li>Include your subscription plan (Free, Pro, or Premium)</li>
+                    <li>Include your subscription plan (Free, Pro, Premium or Ultra)</li>
                 </ul>
             </div>
 
