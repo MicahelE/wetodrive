@@ -11,6 +11,17 @@ use Illuminate\Support\Facades\Log;
 class StreamProgressController extends Controller
 {
     /**
+     * How long the "which transfer is this user running" pointer lives.
+     *
+     * Deliberately far longer than a transfer takes. The pointer is written once
+     * at the start and never refreshed, so anything close to the progress TTL
+     * expires mid-transfer: a 4h40m batch on 2 Sep left its owner watching a
+     * dead progress bar from the 15 minute mark. Liveness is decided by the
+     * progress key, which every update renews, not by this.
+     */
+    private const POINTER_TTL = 86400;
+
+    /**
      * Stream progress updates via Server-Sent Events
      */
     public function streamProgress(Request $request)
@@ -25,9 +36,10 @@ class StreamProgressController extends Controller
 
         // Transfer ids are guessable enough that this stream would otherwise hand
         // out someone else's filename and byte counts. Checked once, here, rather
-        // than inside the loop: the pointer lives as long as the progress key, so
-        // a user returning to a just-finished transfer still passes.
-        if (Cache::get('active_transfer_' . Auth::id()) !== $transferId) {
+        // than inside the loop. Goes through activeTransferFor so the pointer's
+        // long TTL cannot let a finished transfer hold the stream open; a
+        // just-finished one still passes, because its progress lingers 900s.
+        if (self::activeTransferFor((int) Auth::id()) !== $transferId) {
             return response()->json(['error' => 'Not your transfer'], 403);
         }
 
@@ -181,6 +193,11 @@ class StreamProgressController extends Controller
      * — so the progress key is what actually decides. Returns null once there is
      * nothing left to show, which is what keeps a stale id off the homepage.
      */
+    public static function markActiveTransfer(int $userId, string $transferId): void
+    {
+        Cache::put("active_transfer_{$userId}", $transferId, self::POINTER_TTL);
+    }
+
     public static function activeTransferFor(int $userId): ?string
     {
         $transferId = Cache::get("active_transfer_{$userId}");

@@ -384,7 +384,7 @@ class TransferController extends Controller
             // Cached rather than kept in the session so it survives on another
             // device, and expires on its own.
             // ponytail: one live transfer per user, which is all the UI supports.
-            Cache::put("active_transfer_{$user->id}", $transferId, 900);
+            StreamProgressController::markActiveTransfer($user->id, $transferId);
 
             // Import the files individually whenever we can. A single-file
             // transfer is just a batch of one, so this is the ordinary path
