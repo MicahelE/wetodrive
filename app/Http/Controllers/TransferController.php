@@ -318,10 +318,23 @@ class TransferController extends Controller
                     'mimeType' => 'application/octet-stream',
                 ];
 
-                Log::info('Transfer can be imported file by file', [
+                // Decide how to carry it now that we know the shape. Emptying
+                // $items routes to the archive path below, which is the same
+                // code a non-listable transfer already takes.
+                [$strategy, $why] = self::chooseImportStrategy($items);
+
+                Log::info('transfer.strategy', [
+                    'strategy' => $strategy,
+                    'reason' => $why,
                     'file_count' => count($items),
                     'total_size' => $fileInfo['size'],
+                    'avg_file_size' => (int) ($fileInfo['size'] / max(count($items), 1)),
+                    'transfer_id' => $transferId,
                 ]);
+
+                if ($strategy === 'archive') {
+                    $items = [];
+                }
             } else {
                 // Falls back to the whole archive: a folder upload, or anything
                 // whose shape we do not recognise. Delivering the zip is never wrong.
@@ -779,6 +792,49 @@ class TransferController extends Controller
         $this->finishBatch($user, $transferId, $folderId, $claimedTrial, $delivered, $failed, $title, $totalSize);
 
         return;
+    }
+
+    /**
+     * Archive or file-by-file, decided from the manifest before anything is
+     * fetched. Returns [strategy, reason]; the reason is logged so the A/B arms
+     * can be told apart when the numbers are compared later.
+     *
+     * Measured on production batches: per-file costs ~11.5s per file regardless
+     * of size, so ~5MB files move at 0.55 MB/s where the same content as one
+     * archive moves at ~13 MB/s. Large files do not have this problem, and
+     * per-file beats the archive on them, so the split is by shape, not size.
+     */
+    public static function chooseImportStrategy(array $items): array
+    {
+        $count = count($items);
+
+        if ($count === 0) {
+            return ['archive', 'no per-file listing'];
+        }
+
+        // Hard cap first: past this, per-file demonstrably drops files on the
+        // floor, so it is never an arm of the experiment.
+        $cap = (int) config('transfer.per_file_max_files');
+        if ($cap > 0 && $count > $cap) {
+            return ['archive', "file count {$count} over per-file cap {$cap}"];
+        }
+
+        $avg = (int) (array_sum(array_column($items, 'size')) / $count);
+
+        if (config('transfer.ab_test')) {
+            // ponytail: per transfer, not per user. The question is which
+            // strategy suits a given shape, and one user brings one shape.
+            return random_int(0, 1) === 1
+                ? ['archive', "ab:archive avg={$avg} n={$count}"]
+                : ['per-file', "ab:per-file avg={$avg} n={$count}"];
+        }
+
+        $floor = (int) config('transfer.archive_below_avg_bytes');
+        if ($floor > 0 && $avg < $floor) {
+            return ['archive', "avg file {$avg} under {$floor}"];
+        }
+
+        return ['per-file', "avg file {$avg} over {$floor}, {$count} files"];
     }
 
     /**
