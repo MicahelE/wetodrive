@@ -13,6 +13,7 @@ class SubscriptionPlan extends Model
         'price_ngn',
         'price_usd',
         'transfer_limit',
+        'share_limit',
         'max_file_size',
         'features',
         'is_active',

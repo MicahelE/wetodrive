@@ -9,6 +9,7 @@ use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\StreamProgressController;
 use App\Http\Controllers\UnsubscribeController;
+use App\Http\Controllers\TransferShareController;
 
 Route::get('/', [TransferController::class, 'index'])->name('home');
 
@@ -22,6 +23,16 @@ Route::get('/unsubscribe/{user}', [UnsubscribeController::class, 'unsubscribe'])
     ->name('unsubscribe')
     ->middleware('signed');
 Route::post('/transfer', [TransferController::class, 'transfer'])->name('transfer');
+
+// Sharing a WeTransfer link with a collaborator, who pulls it into their own
+// Drive on the sharer's plan limits. The claim page is public because the token
+// is the credential and the recipient has no account yet.
+Route::middleware('auth')->group(function () {
+    Route::get('/shares', [TransferShareController::class, 'index'])->name('shares.index');
+    Route::post('/shares', [TransferShareController::class, 'store'])->name('shares.store');
+    Route::delete('/shares/{share}', [TransferShareController::class, 'destroy'])->name('shares.destroy');
+});
+Route::get('/share/{token}', [TransferShareController::class, 'show'])->name('shares.show');
 
 // Hands the Google Picker a short-lived token for the signed-in user's own Drive.
 Route::get('/drive/picker-token', [TransferController::class, 'pickerToken'])

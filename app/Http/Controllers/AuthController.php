@@ -13,8 +13,14 @@ use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
-    public function redirectToGoogle()
+    public function redirectToGoogle(Request $request)
     {
+        // Someone arriving from a share link has to come back to it after
+        // consent, or they sign in and lose the transfer they were sent.
+        if ($token = $request->query('share')) {
+            session(['pending_share' => $token]);
+        }
+
         return Socialite::driver('google')
             ->scopes(['https://www.googleapis.com/auth/drive.file'])
             ->with(['access_type' => 'offline', 'prompt' => 'consent'])
@@ -77,6 +83,10 @@ class AuthController extends Controller
             ]);
 
             Auth::login($user);
+
+            if ($token = session()->pull('pending_share')) {
+                return redirect()->route('shares.show', $token);
+            }
 
             return redirect()->route('home')->with('success', 'Connected to Google Drive successfully!');
         } catch (\Exception $e) {

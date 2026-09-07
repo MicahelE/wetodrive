@@ -21,6 +21,7 @@ use App\Services\ResumableDownloader;
 use App\Http\Controllers\StreamProgressController;
 use App\Models\SubscriptionPlan;
 use App\Models\Transfer;
+use App\Models\TransferShare;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -163,6 +164,39 @@ class TransferController extends Controller
             return redirect()->back()->with('error', $busy);
         }
 
+        // A shared transfer is claimed here rather than on the claim page, so an
+        // allowance is only spent once a transfer is actually going to start.
+        $claimedShare = null;
+
+        if ($shareToken = $request->input('share_token')) {
+            $claimedShare = TransferShare::where('token', $shareToken)->first();
+
+            $refusal = match (true) {
+                ! $claimedShare => 'That share link is not valid.',
+                $claimedShare->user_id === $user->id => 'This is your own share. Send it to someone else.',
+                default => $claimedShare->unclaimableReason(),
+            };
+
+            if ($refusal === null && ! $claimedShare->claimFor($user)) {
+                $refusal = 'Someone else just claimed this share.';
+            }
+
+            if ($refusal !== null) {
+                return $request->ajax()
+                    ? response()->json(['success' => false, 'error' => $refusal], 422)
+                    : redirect()->route('shares.show', $shareToken)->with('error', $refusal);
+            }
+
+            $user->onSharedAllowance = true;
+            $user->planFrom = $claimedShare->sharer;
+
+            Log::info('share.claimed', [
+                'share_id' => $claimedShare->id,
+                'sharer_id' => $claimedShare->user_id,
+                'claimed_by' => $user->id,
+            ]);
+        }
+
         // Check subscription limits
         if (!$this->checkTransferLimits($user)) {
             Log::warning('Transfer attempted but user exceeded limits', [
@@ -245,7 +279,9 @@ class TransferController extends Controller
         }
 
         try {
-            $wetransferUrl = $request->wetransfer_url;
+            // For a claimed share the link is whatever the sharer recorded, not
+            // whatever was posted alongside the token.
+            $wetransferUrl = $claimedShare?->wetransfer_url ?? $request->wetransfer_url;
             Log::info('Starting WeTransfer process', [
                 'url' => $wetransferUrl,
                 'use_streaming' => $useStreaming,
@@ -1762,6 +1798,10 @@ class TransferController extends Controller
 
     private function checkTransferLimits($user): bool
     {
+        if ($user->onSharedAllowance) {
+            return true; // gated by the sharer's share allowance instead
+        }
+
         // For paid subscriptions, check via subscription model
         if ($user->hasActiveSubscription()) {
             return $user->activeSubscription->canMakeTransfer();
@@ -1784,8 +1824,12 @@ class TransferController extends Controller
     {
         $freeLimit = 100 * 1024 * 1024; // 100MB
 
-        if ($user->hasActiveSubscription()) {
-            return [$user->activeSubscription->subscriptionPlan->max_file_size, false];
+        // A claimed share runs on the sharer's plan. That is the whole point of
+        // the feature: the recipient gets a transfer their own tier would refuse.
+        $planUser = $user->planFrom ?? $user;
+
+        if ($planUser->hasActiveSubscription()) {
+            return [$planUser->activeSubscription->subscriptionPlan->max_file_size, false];
         }
 
         if ($size <= $freeLimit) {

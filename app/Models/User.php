@@ -134,6 +134,12 @@ class User extends Authenticatable
 
     public function incrementTransferCount(): void
     {
+        if ($this->onSharedAllowance) {
+            // The sharer already spent a share on this one; charging the
+            // recipient too would burn an allowance they never agreed to spend.
+            return;
+        }
+
         // Trial consumption is handled atomically at transfer admission
         // (TransferController::resolveFileSizeLimit), not here, so that a
         // small transfer never burns the one-time large-file trial.
@@ -143,6 +149,63 @@ class User extends Authenticatable
         if ($this->hasActiveSubscription()) {
             $this->activeSubscription->incrementTransferCount();
         }
+    }
+
+    /**
+     * Set for the life of one request when this transfer is running on a share
+     * someone else paid for. Declared rather than dynamic so Eloquent's
+     * attribute magic never sees it and it cannot reach a query.
+     */
+    public bool $onSharedAllowance = false;
+
+    /** Whose plan decides the limits for this request, when not this user's. */
+    public ?self $planFrom = null;
+
+    public function transferShares()
+    {
+        return $this->hasMany(TransferShare::class);
+    }
+
+    /**
+     * How many shares this plan allows. Free is once ever, matching how the 3GB
+     * trial works; paid plans get theirs back each billing period.
+     */
+    public function shareLimit(): int
+    {
+        return (int) ($this->hasActiveSubscription()
+            ? ($this->activeSubscription->subscriptionPlan->share_limit ?? 0)
+            : (SubscriptionPlan::where('slug', 'free')->value('share_limit') ?? 0));
+    }
+
+    public function sharesUsed(): int
+    {
+        $used = $this->transferShares()->countsAgainstAllowance();
+
+        // Paid allowances reset with the billing period; the free one never does.
+        // resetTransferCount() pushes period_resets_at a month out, so the period
+        // in progress began a month before it — the same clock transfers use.
+        if ($this->hasActiveSubscription()) {
+            $sub = $this->activeSubscription;
+            $periodStart = $sub->period_resets_at
+                ? $sub->period_resets_at->copy()->subMonth()
+                : $sub->started_at;
+
+            if ($periodStart) {
+                $used->where('created_at', '>=', $periodStart);
+            }
+        }
+
+        return $used->count();
+    }
+
+    public function sharesRemaining(): int
+    {
+        return max($this->shareLimit() - $this->sharesUsed(), 0);
+    }
+
+    public function canShare(): bool
+    {
+        return $this->sharesRemaining() > 0;
     }
 
     public function hasTrialTransferAvailable(): bool
