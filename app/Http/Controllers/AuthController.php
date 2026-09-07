@@ -60,6 +60,16 @@ class AuthController extends Controller
 
             // Send welcome email to new users
             if ($user->wasRecentlyCreated) {
+                // Only on creation. updateOrCreate above also fires on every
+                // later sign-in, and writing then would overwrite the real first
+                // touch with our own domain.
+                if ($source = $request->session()->get('signup_source')) {
+                    $user->forceFill([
+                        'signup_referrer' => $source['referrer'] ?? null,
+                        'signup_landing' => $source['landing'] ?? null,
+                    ])->save();
+                }
+
                 Mail::to($user)->send(new WelcomeMail($user));
             }
 

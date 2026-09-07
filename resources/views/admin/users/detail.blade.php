@@ -43,6 +43,20 @@
                 <td><strong>Joined:</strong></td>
                 <td>{{ $user->created_at->format('M j, Y H:i') }}</td>
             </tr>
+            <tr>
+                <td><strong>Came from:</strong></td>
+                <td>
+                    {{ $user->signupChannel() }}
+                    @if($user->signup_landing)
+                        <br><span style="color:#6c757d;font-size:.85em">landed on {{ $user->signup_landing }}</span>
+                    @endif
+                    @if($user->signup_referrer)
+                        <br><span style="color:#6c757d;font-size:.85em;word-break:break-all">{{ $user->signup_referrer }}</span>
+                    @elseif(!$user->signup_landing)
+                        <br><span style="color:#6c757d;font-size:.85em">signed up before this was recorded</span>
+                    @endif
+                </td>
+            </tr>
         </table>
     </div>
 

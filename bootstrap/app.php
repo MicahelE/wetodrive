@@ -26,6 +26,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // $schedule->command('users:announce-features')->dailyAt('11:00');
     })
     ->withMiddleware(function (Middleware $middleware): void {
+        // First-touch attribution. Has to run on the landing request, because the
+        // referrer is gone by the time anyone reaches the sign-in.
+        $middleware->web(append: [
+            \App\Http\Middleware\CaptureSignupSource::class,
+        ]);
+
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
         ]);

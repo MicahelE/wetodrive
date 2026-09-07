@@ -26,6 +26,8 @@ class User extends Authenticatable
         'google_token',
         'google_refresh_token',
         'country_code',
+        'signup_referrer',
+        'signup_landing',
         'subscription_tier',
         'active_subscription_id',
         'total_transfers',
@@ -160,6 +162,43 @@ class User extends Authenticatable
 
     /** Whose plan decides the limits for this request, when not this user's. */
     public ?self $planFrom = null;
+
+    /**
+     * The raw referrer read as a channel. Derived rather than stored: a channel
+     * guessed at signup time cannot be revised, and the rules do change --
+     * chatgpt.com was not a referrer worth naming a year ago.
+     */
+    public function signupChannel(): string
+    {
+        if (str_starts_with((string) $this->signup_landing, '/share/')) {
+            return 'Shared with them';
+        }
+
+        if (blank($this->signup_referrer)) {
+            return 'Direct or unknown';
+        }
+
+        $host = strtolower((string) parse_url($this->signup_referrer, PHP_URL_HOST));
+
+        return match (true) {
+            str_contains($host, 'google.') => 'Google search',
+            str_contains($host, 'bing.') => 'Bing',
+            str_contains($host, 'duckduckgo.') => 'DuckDuckGo',
+            str_contains($host, 'chatgpt.') || str_contains($host, 'openai.') => 'ChatGPT',
+            str_contains($host, 'perplexity.') => 'Perplexity',
+            str_contains($host, 'claude.') => 'Claude',
+            str_contains($host, 'facebook.') || str_contains($host, 'fb.') => 'Facebook',
+            str_contains($host, 'instagram.') => 'Instagram',
+            str_contains($host, 'reddit.') => 'Reddit',
+            str_contains($host, 'youtube.') => 'YouTube',
+            str_contains($host, 'linkedin.') => 'LinkedIn',
+            str_contains($host, 't.co') || str_contains($host, 'twitter.') || str_contains($host, 'x.com') => 'X',
+            str_contains($host, 'producthunt.') => 'Product Hunt',
+            str_contains($host, 'wetodrive.') => 'Returning visitor',
+            $host === '' => 'Direct or unknown',
+            default => $host,
+        };
+    }
 
     public function transferShares()
     {
