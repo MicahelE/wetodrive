@@ -185,6 +185,35 @@ class TransferShareTest extends TestCase
             fn ($m) => $m->hasTo('editor@example.com'));
     }
 
+    public function test_the_homepage_offers_sharing_to_a_signed_in_user(): void
+    {
+        $this->actingAs(User::factory()->create(['subscription_tier' => 'free']))
+            ->get(route('home'))
+            ->assertOk()
+            ->assertSee(route('shares.index'));
+    }
+
+    public function test_the_admin_user_page_shows_both_sides_of_sharing(): void
+    {
+        $sharer = $this->premiumSharer();
+        $recipient = User::factory()->create(['email' => 'editor@example.com']);
+        $share = $this->share($sharer, ['recipient_email' => 'editor@example.com']);
+        $share->claimFor($recipient);
+
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        // The sender's page names who received it.
+        $this->actingAs($admin)->get(route('admin.users.detail', $sharer))
+            ->assertOk()
+            ->assertSee('Wedding rushes')
+            ->assertSee('editor@example.com');
+
+        // The recipient's page shows they arrived through a share.
+        $this->actingAs($admin)->get(route('admin.users.detail', $recipient))
+            ->assertOk()
+            ->assertSee('Arrived via a share');
+    }
+
     public function test_you_cannot_cancel_someone_elses_share(): void
     {
         $share = $this->share($this->premiumSharer());

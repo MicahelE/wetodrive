@@ -260,6 +260,12 @@
         }
         input[type=url]::placeholder, input[type=text]::placeholder { color: #9AA3B8; }
         input[type=url]:focus, input[type=text]:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(42,66,247,.15); }
+        .share-cta {
+            margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line, #e6e8eb);
+            font-size: .9rem; color: var(--muted, #6c757d); text-align: center;
+        }
+        .share-cta a { color: inherit; font-weight: 650; text-decoration: underline; text-underline-offset: 2px; }
+        .share-cta a:hover { color: var(--brand, #2a42f7); }
         #destination_folder { margin-bottom: 2px; }
         label[for=destination_folder] { margin-top: 16px; }
         .folder-row { display: flex; gap: 8px; align-items: stretch; }
@@ -523,6 +529,7 @@
                             <span>{{ Auth::user()->email }}</span>
                         </div>
                         <a href="{{ route('subscription.manage') }}">Dashboard</a>
+                        <a href="{{ route('shares.index') }}">Share with a collaborator</a>
                         <a href="{{ route('subscription.pricing') }}">Plans and billing</a>
                         @if(Auth::user()->role === 'admin')
                             <a href="{{ route('admin.dashboard') }}">Admin</a>
@@ -652,6 +659,14 @@
 
                         <button type="submit" class="submit-button" id="transferButton">Transfer to Google Drive</button>
                     </form>
+
+                    {{-- Someone with a link in hand is exactly who might want to send
+                         it on, so the offer sits with the form rather than in a menu. --}}
+                    <div class="share-cta">
+                        Working with someone else on this?
+                        <a href="{{ route('shares.index') }}">Send them the files</a>
+                        and they land in their Drive, on your plan's limits.
+                    </div>
                 </div>
 
                 {{-- data-resume is set when this user already has a transfer running.

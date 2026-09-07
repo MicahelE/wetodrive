@@ -160,6 +160,88 @@
 </div>
 
 <div class="stat-card">
+    <h3>Sharing</h3>
+    <p style="color:#6c757d;font-size:.9rem;margin-bottom:12px">
+        Allowance: <strong>{{ $user->sharesRemaining() }} of {{ $user->shareLimit() }}</strong> left
+        @if($user->shareLimit() === 0) (not included in this plan) @endif
+    </p>
+
+    @if($sharesSent->count() > 0)
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Created</th>
+                    <th>Transfer</th>
+                    <th>Size</th>
+                    <th>Sent to</th>
+                    <th>Status</th>
+                    <th>Received by</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($sharesSent as $share)
+                <tr>
+                    <td>{{ $share->created_at->format('M j, Y H:i') }}</td>
+                    <td>{{ $share->title ?: '--' }}@if($share->file_count) <span style="color:#6c757d">({{ number_format($share->file_count) }} files)</span>@endif</td>
+                    <td>{{ $share->total_size ? round($share->total_size / 1073741824, 2) . ' GB' : '--' }}</td>
+                    <td>{{ $share->recipient_email ?: 'link only' }}</td>
+                    <td>
+                        @if($share->isClaimed())
+                            <span class="badge badge-success">Received</span>
+                        @elseif($share->isRevoked())
+                            <span class="badge badge-danger">Cancelled</span>
+                        @elseif($share->isExpired())
+                            <span class="badge badge-warning">Expired</span>
+                        @else
+                            <span class="badge badge-warning">Waiting</span>
+                        @endif
+                    </td>
+                    <td>
+                        @if($share->isClaimed())
+                            {{ $share->claimedBy->email ?? 'deleted user' }}
+                            <br><span style="color:#6c757d;font-size:.85em">{{ $share->claimed_at->format('M j, H:i') }}</span>
+                        @else
+                            --
+                        @endif
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @else
+        <p>No shares sent</p>
+    @endif
+
+    @if($sharesReceived->count() > 0)
+        <h3 style="margin-top:26px">Arrived via a share</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Claimed</th>
+                    <th>From</th>
+                    <th>Transfer</th>
+                    <th>Size</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($sharesReceived as $share)
+                <tr>
+                    <td>{{ $share->claimed_at?->format('M j, Y H:i') ?? '--' }}</td>
+                    <td>
+                        <a href="{{ route('admin.users.detail', $share->user_id) }}">
+                            {{ $share->sharer->email ?? 'deleted user' }}
+                        </a>
+                    </td>
+                    <td>{{ $share->title ?: '--' }}</td>
+                    <td>{{ $share->total_size ? round($share->total_size / 1073741824, 2) . ' GB' : '--' }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+</div>
+
+<div class="stat-card">
     <h3>Transfer History</h3>
     @if($transfers->count() > 0)
         <table class="table">

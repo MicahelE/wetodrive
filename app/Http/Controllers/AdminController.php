@@ -7,6 +7,7 @@ use App\Models\UserSubscription;
 use App\Models\PaymentTransaction;
 use App\Models\SubscriptionPlan;
 use App\Models\Transfer;
+use App\Models\TransferShare;
 use App\Services\PolarService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -112,7 +113,22 @@ class AdminController extends Controller
             ->get()
             ->groupBy('batch_id');
 
-        return view('admin.users.detail', compact('user', 'transfers', 'batchFiles'));
+        // Both sides of sharing: what they sent, and what was sent to them. A
+        // share they claimed is how they arrived, which is worth seeing next to
+        // whether they went on to pay.
+        $sharesSent = $user->transferShares()
+            ->with('claimedBy:id,email')
+            ->latest()
+            ->get();
+
+        $sharesReceived = TransferShare::with('sharer:id,name,email')
+            ->where('claimed_by_user_id', $user->id)
+            ->latest('claimed_at')
+            ->get();
+
+        return view('admin.users.detail', compact(
+            'user', 'transfers', 'batchFiles', 'sharesSent', 'sharesReceived'
+        ));
     }
 
     public function makeAdmin(Request $request, User $user)
