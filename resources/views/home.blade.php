@@ -605,7 +605,7 @@
                     {{-- Worded off the allowance, not "your first transfer": the flag is
                          independent of total_transfers, so it can be true for someone
                          who has already done dozens and the old copy contradicted itself. --}}
-                    <div class="alert alert-success">You have a one-time 3GB allowance available on this transfer.</div>
+                    <div class="alert alert-success">You have a one-time 1GB allowance available on this transfer.</div>
                 @endif
 
                 @if ($left === 0)
@@ -954,7 +954,7 @@
             @foreach ([
                 ['Do I need a WeTransfer account?', 'No. You only need the link somebody sent you. We handle the rest.'],
                 ['What happens if the transfer fails halfway?', 'Large files upload in chunks and resume automatically. If it still fails, it does not count against your quota and we email you what went wrong.'],
-                ['How big a file can I move?', 'Your very first transfer stretches to 3GB. Pro handles up to 25GB, Premium goes to 500GB, and Ultra carries a full 1TB.'],
+                ['How big a file can I move?', 'Your very first transfer stretches to 1GB. Pro handles up to 25GB, Premium goes to 500GB, and Ultra carries a full 1TB.'],
                 ['Do you keep a copy of my files?', 'No. The file streams through to your Drive and the temporary copy is deleted the moment the upload completes.'],
                 ['Can I cancel any time?', 'Yes, in one click from your dashboard. You keep everything you paid for until the end of the current period.'],
             ] as $i => $qa)

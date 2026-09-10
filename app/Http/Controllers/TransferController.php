@@ -141,7 +141,7 @@ class TransferController extends Controller
         $user = Auth::user();
         $useStreaming = $request->get('use_streaming', true); // Default to streaming
 
-        // One transfer at a time. A 3GB batch is 100+ files and runs the best
+        // One transfer at a time. A large batch is 100+ files and runs the best
         // part of an hour, so people resubmit the link or reload the tab; every
         // one of those re-downloads the whole transfer and uploads it again.
         // #518 ran the same 2.97GB link four times over, paying the egress four
@@ -1837,7 +1837,7 @@ class TransferController extends Controller
         }
 
         if ($user->claimTrialTransfer()) {
-            return [3 * 1024 * 1024 * 1024, true]; // trial claimed atomically (3GB)
+            return [1024 * 1024 * 1024, true]; // trial claimed atomically (1GB)
         }
 
         return [$freeLimit, false]; // trial already used/claimed — capped at free tier

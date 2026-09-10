@@ -206,8 +206,8 @@ class User extends Authenticatable
     }
 
     /**
-     * How many shares this plan allows. Free is once ever, matching how the 3GB
-     * trial works; paid plans get theirs back each billing period.
+     * How many shares this plan allows. Free is once ever, matching how the
+     * one-time trial transfer works; paid plans get theirs back each period.
      */
     public function shareLimit(): int
     {

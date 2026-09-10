@@ -42,6 +42,48 @@ class TrialTransferTest extends TestCase
         $this->assertTrue($user->claimTrialTransfer(), 'trial should be claimable again after release');
     }
 
+    public function test_the_trial_ceiling_is_1gb(): void
+    {
+        $user = User::factory()->create([
+            'subscription_tier' => 'free',
+            'has_used_trial_transfer' => false,
+        ]);
+
+        $m = new \ReflectionMethod(\App\Http\Controllers\TransferController::class, 'resolveFileSizeLimit');
+        $m->setAccessible(true);
+
+        // 50MB fits the plain free tier, so the trial stays untouched.
+        [$max, $claimed] = $m->invoke(new \App\Http\Controllers\TransferController(), $user, 50 * 1024 * 1024);
+        $this->assertSame(100 * 1024 * 1024, $max);
+        $this->assertFalse($claimed);
+
+        // 800MB is over the 100MB free tier, so it needs the trial, which is 1GB.
+        [$max, $claimed] = $m->invoke(new \App\Http\Controllers\TransferController(), $user, 800 * 1024 * 1024);
+        $this->assertSame(1024 * 1024 * 1024, $max, 'the one-time allowance is 1GB');
+        $this->assertTrue($claimed);
+    }
+
+    public function test_a_file_over_1gb_does_not_burn_the_trial(): void
+    {
+        $user = User::factory()->create([
+            'subscription_tier' => 'free',
+            'has_used_trial_transfer' => false,
+        ]);
+
+        $m = new \ReflectionMethod(\App\Http\Controllers\TransferController::class, 'resolveFileSizeLimit');
+        $m->setAccessible(true);
+
+        // The claim happens up front, so the caller releases it when the file
+        // still does not fit. What matters here is that it is reported as
+        // claimed, because that is the signal to hand it back.
+        [$max, $claimed] = $m->invoke(new \App\Http\Controllers\TransferController(), $user, 4 * 1024 * 1024 * 1024);
+        $this->assertSame(1024 * 1024 * 1024, $max);
+        $this->assertTrue($claimed, 'caller must know to release it');
+
+        $user->releaseTrialTransfer();
+        $this->assertTrue($user->fresh()->hasTrialTransferAvailable());
+    }
+
     public function test_non_free_users_never_claim_the_free_trial(): void
     {
         $user = User::factory()->create([
