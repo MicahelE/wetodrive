@@ -214,6 +214,24 @@ class TransferShareTest extends TestCase
             ->assertSee('Arrived via a share');
     }
 
+    public function test_the_share_form_prefills_from_a_link(): void
+    {
+        // The completion screen sends the link it just transferred, so the sharer
+        // does not have to paste it a second time.
+        $this->actingAs(User::factory()->create(['subscription_tier' => 'free']))
+            ->get(route('shares.index', ['url' => 'https://we.tl/t-PREFILL1']))
+            ->assertOk()
+            ->assertSee('we.tl/t-PREFILL1');
+    }
+
+    public function test_a_prefilled_link_is_escaped(): void
+    {
+        $this->actingAs(User::factory()->create(['subscription_tier' => 'free']))
+            ->get(route('shares.index', ['url' => '"><script>alert(1)</script>']))
+            ->assertOk()
+            ->assertDontSee('<script>alert(1)</script>', false);
+    }
+
     public function test_you_cannot_cancel_someone_elses_share(): void
     {
         $share = $this->share($this->premiumSharer());

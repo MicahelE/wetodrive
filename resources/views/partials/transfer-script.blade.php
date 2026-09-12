@@ -5,6 +5,11 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('[DEBUG] DOMContentLoaded - Initializing transfer form handler');
 
+            // Kept out here so the completion screen can offer to share the same
+            // link. A reattached transfer never ran the submit handler, so this
+            // stays empty and the share page simply opens without a prefill.
+            let lastTransferUrl = '';
+
             const transferForm = document.getElementById('transferForm');
             console.log('[DEBUG] Transfer form element:', transferForm);
 
@@ -26,6 +31,7 @@
 
                     const formData = new FormData(this);
                     const transferUrl = document.getElementById('wetransfer_url').value;
+                    lastTransferUrl = transferUrl;
 
                     console.log('[DEBUG] Form data prepared:');
                     console.log('[DEBUG] - WeTransfer URL:', transferUrl);
@@ -439,6 +445,19 @@
                                     <button onclick="resetTransferForm()" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
                                         Transfer Another File
                                     </button>
+                                </div>`;
+
+                            // Offer to pass the same link on. Free accounts get one
+                            // share ever, so someone who uses it and wants another
+                            // lands on the plans page by themselves.
+                            successHtml += `
+                                <div style="background: #f8f9fa; border: 1px solid #e9ecef; color: #212529; padding: 15px; border-radius: 8px; margin-top: 12px;">
+                                    <div style="font-weight: 600; margin-bottom: 6px;">Working on this with someone?</div>
+                                    <div style="margin-bottom: 12px;">Send them the same link and it lands in their Google Drive too, on your plan's limits rather than theirs.</div>
+                                    <a href="{{ route('shares.index') }}${lastTransferUrl ? '?url=' + encodeURIComponent(lastTransferUrl) : ''}"
+                                       style="display: inline-block; background: #fff; color: #2a42f7; border: 1px solid #c7cdf9; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+                                        Share these files
+                                    </a>
                                 </div>`;
 
                             if (data.show_upgrade_prompt) {

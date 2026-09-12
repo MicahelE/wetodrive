@@ -32,7 +32,8 @@
                 @csrf
                 <label for="wetransfer_url">WeTransfer link</label>
                 <input type="url" id="wetransfer_url" name="wetransfer_url" required
-                       placeholder="https://we.tl/t-XXXXXXXXXX" value="{{ old('wetransfer_url') }}">
+                       placeholder="https://we.tl/t-XXXXXXXXXX"
+                       value="{{ old('wetransfer_url', request('url')) }}">
 
                 <label for="recipient_email">Their email <span style="font-weight:400;color:#6c757d">(optional)</span></label>
                 <input type="email" id="recipient_email" name="recipient_email"
