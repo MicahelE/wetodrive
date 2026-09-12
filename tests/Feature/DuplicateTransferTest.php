@@ -54,6 +54,43 @@ class DuplicateTransferTest extends TestCase
             ->assertJsonFragment(['error' => 'You already have a transfer running. Wait for it to finish, then start the next one.']);
     }
 
+    /**
+     * The regression user #22 hit: a transfer finished, they deleted the files in
+     * Drive, tried again, and were told one was already running. A completed
+     * transfer keeps its progress for 15 minutes so a returning user still sees
+     * the result, and that must not read as "busy".
+     */
+    public function test_a_just_completed_transfer_does_not_block_the_next_one(): void
+    {
+        $user = User::factory()->create(['subscription_tier' => 'free']);
+        $this->running($user);
+
+        $this->assertNotNull(StreamProgressController::runningTransferFor($user->id));
+
+        StreamProgressController::completeTransfer('transfer_abc', true, ['success' => true]);
+
+        // Still showable, so the result page works...
+        $this->assertSame('transfer_abc', StreamProgressController::activeTransferFor($user->id));
+        // ...but no longer running, so a new transfer is allowed.
+        $this->assertNull(StreamProgressController::runningTransferFor($user->id));
+
+        $response = $this->actingAs($user)
+            ->withHeaders(['X-Requested-With' => 'XMLHttpRequest'])
+            ->postJson('/transfer', ['wetransfer_url' => self::LINK]);
+
+        $this->assertNotSame(409, $response->status(), 'a finished transfer must not block the next one');
+    }
+
+    public function test_a_failed_transfer_does_not_block_the_next_one(): void
+    {
+        $user = User::factory()->create(['subscription_tier' => 'free']);
+        $this->running($user);
+
+        StreamProgressController::completeTransfer('transfer_abc', false, ['success' => false]);
+
+        $this->assertNull(StreamProgressController::runningTransferFor($user->id));
+    }
+
     public function test_a_finished_transfer_does_not_block_the_next_one(): void
     {
         $user = User::factory()->create(['subscription_tier' => 'free']);

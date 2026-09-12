@@ -206,4 +206,26 @@ class StreamProgressController extends Controller
             ? $transferId
             : null;
     }
+
+    /**
+     * The transfer this user has actually RUNNING, which is a narrower question
+     * than activeTransferFor(): a finished transfer keeps its progress for 15
+     * minutes so someone who closed the tab still sees the result, and that
+     * lingering entry is not a reason to refuse them a new transfer.
+     *
+     * Anything that decides "is this user busy" wants this. Anything that shows
+     * a result wants activeTransferFor().
+     */
+    public static function runningTransferFor(int $userId): ?string
+    {
+        $transferId = static::activeTransferFor($userId);
+
+        if (! $transferId) {
+            return null;
+        }
+
+        $status = Cache::get("transfer_progress_{$transferId}")['status'] ?? null;
+
+        return in_array($status, ['completed', 'failed'], true) ? null : $transferId;
+    }
 }

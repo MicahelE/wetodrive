@@ -150,7 +150,7 @@ class TransferController extends Controller
         // submissions seconds apart can still both get through. Every duplicate
         // seen in production was minutes apart, so this covers them; seed the
         // progress entry at the guard if the narrow race ever shows up.
-        if (StreamProgressController::activeTransferFor($user->id)) {
+        if (StreamProgressController::runningTransferFor($user->id)) {
             Log::info('Duplicate transfer refused, one already running', [
                 'user_id' => $user->id,
             ]);
@@ -1905,7 +1905,7 @@ class TransferController extends Controller
             // Belt and braces with the duplicate guard above: never let an
             // upgrade pitch land while a transfer is running, because read mid
             // upload it looks like that transfer failed.
-            if (StreamProgressController::activeTransferFor($user->id)) {
+            if (StreamProgressController::runningTransferFor($user->id)) {
                 return;
             }
 
