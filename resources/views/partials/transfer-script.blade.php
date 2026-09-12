@@ -2,13 +2,16 @@
      homepage and the v2 test homepage, which reuse the same element ids. --}}
         // Transfer Form Handling with Progress
         @auth
+        // Script scope on purpose. The submit handler sets it, and the SSE
+        // completion handler reads it, and those live in different top-level
+        // functions -- declaring it inside DOMContentLoaded put it out of reach
+        // of the handler and threw, which took the whole completion screen with
+        // it. A reattached transfer never runs the submit handler, so this stays
+        // empty and the share link simply opens without a prefill.
+        let lastTransferUrl = '';
+
         document.addEventListener('DOMContentLoaded', function() {
             console.log('[DEBUG] DOMContentLoaded - Initializing transfer form handler');
-
-            // Kept out here so the completion screen can offer to share the same
-            // link. A reattached transfer never ran the submit handler, so this
-            // stays empty and the share page simply opens without a prefill.
-            let lastTransferUrl = '';
 
             const transferForm = document.getElementById('transferForm');
             console.log('[DEBUG] Transfer form element:', transferForm);
