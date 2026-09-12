@@ -180,4 +180,27 @@ class HomepageTest extends TestCase
         // for as long as it actually renders.
         $this->assertStringContainsString('WetoDrive', $this->legacyHtml());
     }
+
+    /**
+     * lastTransferUrl is written by the submit handler and read by the SSE
+     * completion handler, which live in different top-level functions. Declared
+     * inside DOMContentLoaded it was out of reach of the reader and threw,
+     * taking the entire completion screen down with it -- Drive link, file list
+     * and upgrade prompt included. Pin it at script scope.
+     */
+    public function test_the_share_nudge_variable_is_declared_at_script_scope(): void
+    {
+        $html = $this->actingAs(User::factory()->create())->get('/')->getContent();
+
+        $declared = strpos($html, 'let lastTransferUrl');
+        $domReady = strpos($html, "DOMContentLoaded', function");
+
+        $this->assertNotFalse($declared, 'the nudge needs its link holder');
+        $this->assertNotFalse($domReady);
+        $this->assertLessThan(
+            $domReady,
+            $declared,
+            'declare it at script scope, or the completion handler cannot see it'
+        );
+    }
 }
