@@ -49,6 +49,12 @@ class AuthController extends Controller
                 Log::warning('No refresh token received from Google. User may need to revoke access and re-authenticate.');
             }
 
+            // What Google actually granted. Socialite fills approvedScopes from
+            // the token response; the callback's own ?scope= is the fallback,
+            // because a missing scope must never be mistaken for a granted one.
+            $granted = implode(' ', (array) ($googleUser->approvedScopes ?: []))
+                ?: (string) $request->query('scope');
+
             $user = User::updateOrCreate([
                 'email' => $googleUser->getEmail(),
             ], [
@@ -56,6 +62,7 @@ class AuthController extends Controller
                 'google_id' => $googleUser->getId(),
                 'google_token' => json_encode($tokenData),
                 'google_refresh_token' => $googleUser->refreshToken,
+                'google_scopes' => $granted ?: null,
             ]);
 
             // Send welcome email to new users
@@ -93,6 +100,22 @@ class AuthController extends Controller
             ]);
 
             Auth::login($user);
+
+            if (! $user->hasDriveAccess()) {
+                // Drive is a tick-box on Google's consent screen and is easily
+                // clicked past. Say so now: the alternative is letting them
+                // start a transfer that downloads everything and is then
+                // refused by Drive, which is how #603 lost 2.5GB and 35 minutes.
+                Log::warning('Sign-in granted no Drive scope', [
+                    'user_id' => $user->id,
+                    'granted' => $granted,
+                ]);
+
+                return redirect()->route('home')->with(
+                    'drive_permission_missing',
+                    'Almost there. Google did not grant access to your Drive, so we cannot deliver files yet. Reconnect and tick "See, edit, create and delete only the specific Google Drive files you use with this app".'
+                );
+            }
 
             if ($token = session()->pull('pending_share')) {
                 return redirect()->route('shares.show', $token);

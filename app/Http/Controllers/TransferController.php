@@ -164,6 +164,26 @@ class TransferController extends Controller
             return redirect()->back()->with('error', $busy);
         }
 
+        // Nothing can land without the Drive scope, so refuse before a single
+        // byte is fetched. #603 was allowed through three times and each attempt
+        // downloaded every file in full before Drive refused it -- 2.52GB and
+        // 35 minutes for nothing.
+        if (! $user->hasDriveAccess()) {
+            Log::warning('Transfer refused, no Drive scope granted', ['user_id' => $user->id]);
+
+            $message = 'WeToDrive does not have permission to add files to your Google Drive. Reconnect and allow Drive access, then try again.';
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $message,
+                    'needs_reconnect' => true,
+                ], 403);
+            }
+
+            return redirect()->back()->with('error', $message);
+        }
+
         // A shared transfer is claimed here rather than on the claim page, so an
         // allowance is only spent once a transfer is actually going to start.
         $claimedShare = null;

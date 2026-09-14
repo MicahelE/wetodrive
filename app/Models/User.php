@@ -26,6 +26,7 @@ class User extends Authenticatable
         'google_token',
         'google_refresh_token',
         'country_code',
+        'google_scopes',
         'signup_referrer',
         'signup_landing',
         'subscription_tier',
@@ -198,6 +199,26 @@ class User extends Authenticatable
             $host === '' => 'Direct or unknown',
             default => $host,
         };
+    }
+
+    /** The Drive scope every transfer needs. */
+    public const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+    /**
+     * Did Google actually grant Drive access at the last sign-in?
+     *
+     * Drive is a tick-box on the consent screen and it is easy to click past.
+     * Unknown reads as granted: users who signed in before we recorded scopes
+     * have NULL here and must not be locked out of a working account. Only a
+     * scope list we have seen, and which lacks Drive, returns false.
+     */
+    public function hasDriveAccess(): bool
+    {
+        if (blank($this->google_scopes)) {
+            return true; // never recorded, so we cannot say it is missing
+        }
+
+        return str_contains($this->google_scopes, self::DRIVE_SCOPE);
     }
 
     public function transferShares()

@@ -608,6 +608,20 @@
                     <div class="alert alert-success">You have a one-time 1GB allowance available on this transfer.</div>
                 @endif
 
+                {{-- Drive access is a tick-box on Google's consent screen and is
+                     easily clicked past. Without it nothing can ever land, so say
+                     so before they paste a link rather than after a long upload. --}}
+                @if (Auth::check() && ! Auth::user()->hasDriveAccess())
+                    <div class="alert alert-error">
+                        <strong>Google Drive access is not granted yet.</strong>
+                        Files cannot be delivered until it is.
+                        <a href="{{ route('auth.google') }}" style="font-weight:600;">Reconnect</a>
+                        and tick the box for Drive access on Google's screen.
+                    </div>
+                @elseif (session('drive_permission_missing'))
+                    <div class="alert alert-error">{{ session('drive_permission_missing') }}</div>
+                @endif
+
                 @if ($left === 0)
                     <div class="alert alert-error">
                         You have used all your transfers on the Free plan.
