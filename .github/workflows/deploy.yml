@@ -24,5 +24,9 @@ jobs:
             npm ci && npm run build
             php artisan migrate --force
             php artisan config:cache
+            # After config:cache, because the URL list reads config (APP_URL, Dropbox).
+            # It only rewrites when a page was added or removed. Never commit
+            # public/sitemap.xml: it is modified here, and git pull would refuse.
+            php artisan sitemap:generate
             php artisan route:cache
             php artisan view:cache

@@ -126,12 +126,32 @@ class GenerateSitemap extends Command
 
         $sitemap .= '</urlset>';
 
-        // Write sitemap to public directory
+        // This runs on every deploy. Only the URL list decides whether to write:
+        // rewriting an unchanged list would move every <lastmod> to today and
+        // tell crawlers every page changed when none did.
         $sitemapPath = public_path('sitemap.xml');
-        File::put($sitemapPath, $sitemap);
+
+        if (File::exists($sitemapPath) && $this->urlsIn(File::get($sitemapPath)) === array_column($publicRoutes, 'url')) {
+            $this->info('Sitemap unchanged, left as is: ' . $sitemapPath);
+
+            return 0;
+        }
+
+        // Written beside it and renamed over it, so a crawler fetching during a
+        // deploy never gets half a file.
+        File::put($sitemapPath . '.tmp', $sitemap);
+        File::move($sitemapPath . '.tmp', $sitemapPath);
 
         $this->info('Sitemap generated successfully at: ' . $sitemapPath);
-        
+
         return 0;
+    }
+
+    /** The <loc> values of an existing sitemap, in order. */
+    private function urlsIn(string $xml): array
+    {
+        preg_match_all('#<loc>(.*?)</loc>#', $xml, $matches);
+
+        return $matches[1];
     }
 }
