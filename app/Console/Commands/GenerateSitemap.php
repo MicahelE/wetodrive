@@ -69,6 +69,13 @@ class GenerateSitemap extends Command
                 'changefreq' => 'weekly',
                 'priority' => '0.9'
             ],
+            // Only where the page exists; it 404s until Dropbox is configured.
+            ...(config('services.dropbox.client_id') ? [[
+                'url' => $baseUrl . '/dropbox',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'weekly',
+                'priority' => '0.9'
+            ]] : []),
             [
                 'url' => $baseUrl . '/help',
                 'lastmod' => now()->format('Y-m-d'),

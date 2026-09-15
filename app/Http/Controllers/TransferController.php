@@ -17,6 +17,7 @@ use App\Mail\TransferFailedMail;
 use App\Mail\UpgradeNudgeMail;
 use App\Services\DriveFolderService;
 use App\Services\StreamTransferService;
+use App\Services\DropboxService;
 use App\Services\ResumableDownloader;
 use App\Http\Controllers\StreamProgressController;
 use App\Models\SubscriptionPlan;
@@ -62,7 +63,7 @@ class TransferController extends Controller
         // returning user gets handed the id back and the page reattaches to the
         // live progress stream.
         $activeTransfer = Auth::check()
-            ? StreamProgressController::activeTransferFor(Auth::id())
+            ? StreamProgressController::activeTransferFor(Auth::id(), 'drive')
             : null;
 
         // Folders this app made for this user. Under the drive.file scope these
@@ -76,6 +77,27 @@ class TransferController extends Controller
             : [];
 
         return view('home', compact('stats', 'activeTransfer', 'recentFolders'));
+    }
+
+    /**
+     * WeTransfer to Dropbox, on a page of its own so the homepage stays about
+     * Drive. 404 until Dropbox is configured, which keeps it off production
+     * while the Dropbox app is still in development mode.
+     */
+    public function dropbox()
+    {
+        abort_unless(config('services.dropbox.client_id'), 404);
+
+        if (! Auth::check()) {
+            // Signing in is still Google. Come back here after it, not to the homepage.
+            session(['url.intended' => route('dropbox')]);
+        }
+
+        $activeTransfer = Auth::check()
+            ? StreamProgressController::activeTransferFor(Auth::id(), 'dropbox')
+            : null;
+
+        return view('dropbox', compact('activeTransfer'));
     }
 
     /**
@@ -123,6 +145,7 @@ class TransferController extends Controller
             // Set when the folder came from the Google Picker, in which case it
             // already exists and must not be created from its name.
             'destination_folder_id' => 'nullable|string|max:255',
+            'destination' => 'nullable|in:drive,dropbox',
         ]);
 
         if (!Auth::check()) {
@@ -140,6 +163,10 @@ class TransferController extends Controller
 
         $user = Auth::user();
         $useStreaming = $request->get('use_streaming', true); // Default to streaming
+
+        // Request-scoped, like onSharedAllowance: every upload point below reads
+        // it off the user rather than having a destination threaded through it.
+        $user->deliverTo = $request->input('destination') === 'dropbox' ? 'dropbox' : 'drive';
 
         // One transfer at a time. A large batch is 100+ files and runs the best
         // part of an hour, so people resubmit the link or reload the tab; every
@@ -168,7 +195,17 @@ class TransferController extends Controller
         // byte is fetched. #603 was allowed through three times and each attempt
         // downloaded every file in full before Drive refused it -- 2.52GB and
         // 35 minutes for nothing.
-        if (! $user->hasDriveAccess()) {
+        if ($user->deliverTo === 'dropbox' && ! $user->hasDropbox()) {
+            $message = 'Connect your Dropbox first, then try again.';
+
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'error' => $message, 'needs_dropbox' => true], 403);
+            }
+
+            return redirect()->back()->with('error', $message);
+        }
+
+        if ($user->deliverTo === 'drive' && ! $user->hasDriveAccess()) {
             Log::warning('Transfer refused, no Drive scope granted', ['user_id' => $user->id]);
 
             $message = 'WeToDrive does not have permission to add files to your Google Drive. Reconnect and allow Drive access, then try again.';
@@ -243,7 +280,13 @@ class TransferController extends Controller
         try {
             $pickedId = $request->input('destination_folder_id');
 
-            if ($pickedId) {
+            if ($user->deliverTo === 'dropbox') {
+                // Dropbox is addressed by path and creates missing folders as a
+                // file lands, so there is nothing to look up or make. From here
+                // on the "folder id" is that path.
+                $folderLabel = DriveFolderService::normalizePath($request->input('destination_folder'));
+                $folderId = $folderLabel === '' ? null : DropboxService::path($folderLabel);
+            } elseif ($pickedId) {
                 // Chosen through the Picker, so it already exists in their Drive
                 // and picking is what granted us access to it. Creating anything
                 // here would make a duplicate beside the folder they chose.
@@ -260,7 +303,7 @@ class TransferController extends Controller
             // Confirm we can actually write there before a single byte moves. The
             // Picker offers read-only shared folders too, and without this the
             // whole transfer downloads and then fails on every file.
-            if ($folderId && !DriveFolderService::for($user)->canAddFilesTo($folderId)) {
+            if ($user->deliverTo === 'drive' && $folderId && !DriveFolderService::for($user)->canAddFilesTo($folderId)) {
                 $message = 'You do not have permission to add files to that folder. '
                     . 'Pick a folder you own, or ask its owner for edit access.';
 
@@ -448,12 +491,39 @@ class TransferController extends Controller
                 );
             }
 
+            // Free Dropbox is 2GB. Checked before anything is fetched, or a full
+            // Dropbox is only discovered once the whole transfer has downloaded.
+            if ($user->deliverTo === 'dropbox') {
+                $free = DropboxService::for($user)->freeSpace();
+
+                if ($free !== null && $fileInfo['size'] > $free) {
+                    if ($claimedTrial) {
+                        $user->releaseTrialTransfer();
+                    }
+
+                    Log::warning('Dropbox too full for transfer', [
+                        'user_id' => $user->id,
+                        'size' => $fileInfo['size'],
+                        'free' => $free,
+                    ]);
+
+                    $message = 'There is not enough space in your Dropbox for this transfer: it needs '
+                        . $this->formatFileSize($fileInfo['size']) . ' and ' . $this->formatFileSize($free) . ' is free.';
+
+                    if ($request->ajax()) {
+                        return response()->json(['success' => false, 'error' => $message], 507);
+                    }
+
+                    return redirect()->back()->with('error', $message);
+                }
+            }
+
             // The homepage reads this back to reattach its progress bar after a
             // reload, so a user who closes the tab mid-transfer is not stranded.
             // Cached rather than kept in the session so it survives on another
             // device, and expires on its own.
             // ponytail: one live transfer per user, which is all the UI supports.
-            StreamProgressController::markActiveTransfer($user->id, $transferId);
+            StreamProgressController::markActiveTransfer($user->id, $transferId, $user->deliverTo);
 
             // Import the files individually whenever we can. A single-file
             // transfer is just a batch of one, so this is the ordinary path
@@ -574,6 +644,7 @@ class TransferController extends Controller
                         'filename' => $fileInfo['filename'],
                         'file_size' => $fileInfo['size'],
                         'google_drive_id' => $googleDriveFileId,
+                        'destination' => $user->deliverTo,
                         'transferred_at' => now(),
                     ]);
 
@@ -581,13 +652,15 @@ class TransferController extends Controller
                     StreamProgressController::completeTransfer($transferId, true, [
                         'success' => true,
                         'google_drive_id' => $googleDriveFileId,
+                        'url' => $this->deliveredUrl($user, $googleDriveFileId),
+                        'destination' => $this->destinationName($user),
                         'filename' => $fileInfo['filename'],
                         // Nudge non-paid users to upgrade at the moment of value.
                         'show_upgrade_prompt' => !$user->hasActiveSubscription(),
                     ]);
 
                     try {
-                        $driveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
+                        $driveUrl = $this->deliveredUrl($user, $googleDriveFileId);
                         Log::info('Sending transfer complete email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
                         Mail::to($user)->send(new TransferCompleteMail(
                             $user,
@@ -674,10 +747,11 @@ class TransferController extends Controller
                 'filename' => $fileInfo['filename'],
                 'file_size' => $fileInfo['size'],
                 'google_drive_id' => $googleDriveFileId,
+                'destination' => $user->deliverTo,
                 'transferred_at' => now(),
             ]);
 
-            $googleDriveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
+            $googleDriveUrl = $this->deliveredUrl($user, $googleDriveFileId);
 
             try {
                 Log::info('Sending transfer complete email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
@@ -696,8 +770,9 @@ class TransferController extends Controller
                 ]);
             }
 
-            $successMessage = 'File transferred to Google Drive successfully! ' .
-                '<a href="' . $googleDriveUrl . '" target="_blank" style="color: #4285f4; text-decoration: underline; font-weight: 600;">📁 View in Google Drive</a>';
+            $destination = $this->destinationName($user);
+            $successMessage = "File transferred to {$destination} successfully! " .
+                '<a href="' . $googleDriveUrl . '" target="_blank" style="color: #4285f4; text-decoration: underline; font-weight: 600;">📁 View in ' . $destination . '</a>';
 
             return redirect()->back()->with('success', $successMessage);
 
@@ -791,7 +866,7 @@ class TransferController extends Controller
         $delivered = [];
         $failed = [];
         $bytesDone = 0;
-        $folders = DriveFolderService::for($user);
+        $folders = $user->deliverTo === 'drive' ? DriveFolderService::for($user) : null;
 
         foreach ($items as $index => $item) {
             $position = $index + 1;
@@ -808,9 +883,11 @@ class TransferController extends Controller
                 // the structure the sender had is rebuilt under the destination
                 // rather than becoming a slash in the filename.
                 $relativeDir = trim(str_replace('\\', '/', dirname($item['name'])), '.');
-                $itemFolderId = $relativeDir === ''
-                    ? $folderId
-                    : $folders->resolveWithin($user, $folderId, $folderLabel, $relativeDir);
+                $itemFolderId = match (true) {
+                    $relativeDir === '' => $folderId,
+                    $user->deliverTo === 'dropbox' => DropboxService::path($folderId, $relativeDir),
+                    default => $folders->resolveWithin($user, $folderId, $folderLabel, $relativeDir),
+                };
 
                 $driveId = $this->importOneFile(
                     $streamService, $pageUrl, $item, $user, $transferId, $itemFolderId,
@@ -823,12 +900,14 @@ class TransferController extends Controller
                     'filename' => $item['name'],
                     'file_size' => $item['size'],
                     'google_drive_id' => $driveId,
+                    'destination' => $user->deliverTo,
                     'transferred_at' => now(),
                 ]);
 
                 $delivered[] = [
                     'filename' => $item['name'],
                     'google_drive_id' => $driveId,
+                    'url' => $this->deliveredUrl($user, $driveId),
                     'size' => $item['size'],
                 ];
             } catch (\Throwable $e) {
@@ -988,7 +1067,8 @@ class TransferController extends Controller
             $user->releaseTrialTransfer();
         }
 
-        $folderUrl = $folderId ? "https://drive.google.com/drive/folders/{$folderId}" : null;
+        // Dropbox has no page for a single file, so it always opens the folder.
+        $folderUrl = $folderId || $user->deliverTo === 'dropbox' ? $this->deliveredUrl($user, null, $folderId) : null;
 
         StreamProgressController::completeTransfer($transferId, $anyDelivered, [
             'success' => $anyDelivered,
@@ -996,6 +1076,7 @@ class TransferController extends Controller
             'failed' => $failed,
             'file_count' => count($delivered),
             'folder_url' => $folderUrl,
+            'destination' => $this->destinationName($user),
             'filename' => $title,
             // A single-file batch keeps the old shape so the existing UI still works.
             'google_drive_id' => $anyDelivered && count($delivered) === 1 ? $delivered[0]['google_drive_id'] : null,
@@ -1013,7 +1094,7 @@ class TransferController extends Controller
                     $user,
                     $summary,
                     $this->formatFileSize($totalSize),
-                    $folderUrl ?? 'https://drive.google.com/drive/my-drive',
+                    $folderUrl ?? $this->deliveredUrl($user),
                 ));
             } else {
                 Mail::to($user)->send(new TransferFailedMail($user, $title, $failed[0]['error'] ?? 'Transfer failed'));
@@ -1112,6 +1193,7 @@ class TransferController extends Controller
                     'filename' => $fileInfo['filename'],
                     'file_size' => $fileInfo['size'],
                     'google_drive_id' => $googleDriveFileId,
+                    'destination' => $user->deliverTo,
                     'transferred_at' => now(),
                 ]);
 
@@ -1119,13 +1201,15 @@ class TransferController extends Controller
                 StreamProgressController::completeTransfer($transferId, true, [
                     'success' => true,
                     'google_drive_id' => $googleDriveFileId,
+                    'url' => $this->deliveredUrl($user, $googleDriveFileId),
+                    'destination' => $this->destinationName($user),
                     'filename' => $fileInfo['filename'],
                     // Nudge non-paid users to upgrade at the moment of value.
                     'show_upgrade_prompt' => !$user->hasActiveSubscription(),
                 ]);
 
                 try {
-                    $driveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
+                    $driveUrl = $this->deliveredUrl($user, $googleDriveFileId);
                     Log::info('Sending transfer complete email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
                     Mail::to($user)->send(new TransferCompleteMail(
                         $user,
@@ -1270,10 +1354,11 @@ class TransferController extends Controller
                 'filename' => $fileInfo['filename'],
                 'file_size' => $fileInfo['size'],
                 'google_drive_id' => $googleDriveFileId,
+                'destination' => $user->deliverTo,
                 'transferred_at' => now(),
             ]);
 
-            $googleDriveUrl = "https://drive.google.com/file/d/{$googleDriveFileId}/view";
+            $googleDriveUrl = $this->deliveredUrl($user, $googleDriveFileId);
 
             try {
                 Log::info('Sending transfer complete email', ['user_email' => $user->email, 'filename' => $fileInfo['filename']]);
@@ -1292,8 +1377,9 @@ class TransferController extends Controller
                 ]);
             }
 
-            $successMessage = 'File transferred to Google Drive successfully! ' .
-                '<a href="' . $googleDriveUrl . '" target="_blank" style="color: #4285f4; text-decoration: underline; font-weight: 600;">📁 View in Google Drive</a>';
+            $destination = $this->destinationName($user);
+            $successMessage = "File transferred to {$destination} successfully! " .
+                '<a href="' . $googleDriveUrl . '" target="_blank" style="color: #4285f4; text-decoration: underline; font-weight: 600;">📁 View in ' . $destination . '</a>';
 
             return redirect()->back()->with('success', $successMessage);
         } catch (\Exception $e) {
@@ -1660,6 +1746,23 @@ class TransferController extends Controller
             if (!file_exists($tempFile)) {
                 throw new \Exception('Temporary file not found: ' . $tempFile);
             }
+
+            // ponytail: branches here rather than renaming, so every caller of
+            // this method sends to whichever destination was chosen unchanged.
+            if ($user->deliverTo === 'dropbox') {
+                $handle = fopen($tempFile, 'rb');
+
+                try {
+                    return DropboxService::for($user)->upload(
+                        $handle,
+                        DropboxService::path($folderId, $fileInfo['filename']),
+                        $progressCallback,
+                        (int) filesize($tempFile),
+                    )['path_display'];
+                } finally {
+                    fclose($handle);
+                }
+            }
             
             $client = new Google_Client();
             
@@ -1814,6 +1917,29 @@ class TransferController extends Controller
                 Log::info('Cleaned up temp file', ['temp_file' => $tempFile]);
             }
         }
+    }
+
+    /**
+     * Where to send someone to see what landed: the file, else its folder, else
+     * the top of their storage. For Dropbox the file "id" is its path.
+     */
+    private function deliveredUrl($user, ?string $fileId = null, ?string $folderId = null): string
+    {
+        if ($user->deliverTo === 'dropbox') {
+            // dropbox.com has no page for one file, so open the folder holding it.
+            return DropboxService::webUrl($fileId !== null ? dirname($fileId) : $folderId);
+        }
+
+        return match (true) {
+            $fileId !== null => "https://drive.google.com/file/d/{$fileId}/view",
+            $folderId !== null => "https://drive.google.com/drive/folders/{$folderId}",
+            default => 'https://drive.google.com/drive/my-drive',
+        };
+    }
+
+    private function destinationName($user): string
+    {
+        return $user->deliverTo === 'dropbox' ? 'Dropbox' : 'Google Drive';
     }
 
     private function checkTransferLimits($user): bool

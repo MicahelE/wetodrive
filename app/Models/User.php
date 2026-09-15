@@ -50,6 +50,7 @@ class User extends Authenticatable
         'remember_token',
         'google_token',
         'google_refresh_token',
+        'dropbox_refresh_token',
     ];
 
     /**
@@ -68,6 +69,7 @@ class User extends Authenticatable
             'email_opt_out' => 'boolean',
             'winback_email_sent' => 'boolean',
             'feature_email_sent' => 'boolean',
+            'dropbox_refresh_token' => 'encrypted',
         ];
     }
 
@@ -164,6 +166,9 @@ class User extends Authenticatable
     /** Whose plan decides the limits for this request, when not this user's. */
     public ?self $planFrom = null;
 
+    /** Where this request's files go, 'drive' or 'dropbox'. Declared for the same reason. */
+    public string $deliverTo = 'drive';
+
     /**
      * The raw referrer read as a channel. Derived rather than stored: a channel
      * guessed at signup time cannot be revised, and the rules do change --
@@ -214,11 +219,26 @@ class User extends Authenticatable
      */
     public function hasDriveAccess(): bool
     {
+        if ($this->isDropboxOnly()) {
+            return false; // there is no Drive at all
+        }
+
         if (blank($this->google_scopes)) {
             return true; // never recorded, so we cannot say it is missing
         }
 
         return str_contains($this->google_scopes, self::DRIVE_SCOPE);
+    }
+
+    /** Signed up through Dropbox and never connected Google. */
+    public function isDropboxOnly(): bool
+    {
+        return blank($this->google_id) && filled($this->dropbox_account_id);
+    }
+
+    public function hasDropbox(): bool
+    {
+        return filled($this->dropbox_refresh_token);
     }
 
     public function transferShares()

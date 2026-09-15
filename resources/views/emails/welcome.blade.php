@@ -1,7 +1,7 @@
 <x-mail::message>
 # Welcome to WeToDrive, {{ $user->name }}!
 
-You're all set to transfer files from WeTransfer directly to your Google Drive.
+You're all set to transfer files from WeTransfer directly to your {{ $user->google_id ? 'Google Drive' : 'Dropbox' }}.
 
 Here's what you can do with your free plan:
 - **5 transfers** per month
@@ -9,7 +9,7 @@ Here's what you can do with your free plan:
 
 Ready to get started? Just paste a WeTransfer link and we'll handle the rest.
 
-<x-mail::button :url="route('home')">
+<x-mail::button :url="$user->google_id ? route('home') : route('dropbox')">
 Start Transferring
 </x-mail::button>
 

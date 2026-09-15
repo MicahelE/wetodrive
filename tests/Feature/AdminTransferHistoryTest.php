@@ -53,6 +53,28 @@ class AdminTransferHistoryTest extends TestCase
         }
     }
 
+    public function test_a_dropbox_transfer_is_marked_and_opens_in_dropbox(): void
+    {
+        $user = User::factory()->create();
+        Transfer::create([
+            'user_id' => $user->id,
+            'filename' => 'take one.mov',
+            'file_size' => 1000,
+            'google_drive_id' => '/Clients/Day 1/take one.mov',
+            'destination' => 'dropbox',
+            'transferred_at' => '2026-09-15 10:00:00',
+        ]);
+        $this->file($user, null, 'drive.mov', 1000, '2026-09-14 10:00:00');
+
+        $html = $this->actingAs($this->admin())->get("/admin/users/{$user->id}")->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/<td[^>]*>Dropbox<\/td>/', $html);
+        $this->assertMatchesRegularExpression('/<td[^>]*>Google Drive<\/td>/', $html);
+        $this->assertStringContainsString('href="https://www.dropbox.com/home/Clients/Day%201"', $html);
+        $this->assertStringContainsString('href="https://drive.google.com/file/d/d-drive.mov/view"', $html);
+        $this->assertStringNotContainsString('drive.google.com/file/d//Clients', $html);
+    }
+
     public function test_separate_transfers_stay_separate(): void
     {
         $user = User::factory()->create();

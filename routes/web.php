@@ -74,6 +74,15 @@ Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->name('a
 Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 Route::post('/auth/disconnect', [AuthController::class, 'disconnect'])->name('auth.disconnect');
 
+// WeTransfer to Dropbox has its own page. Public, so a guest can see what it
+// is and sign in from it; 404 until Dropbox is configured.
+Route::get('/dropbox', [TransferController::class, 'dropbox'])->name('dropbox');
+
+// Signed in, Dropbox connects to the account; signed out, it is the sign-in.
+Route::get('/auth/dropbox', [AuthController::class, 'redirectToDropbox'])->name('auth.dropbox');
+Route::get('/auth/dropbox/callback', [AuthController::class, 'handleDropboxCallback'])->name('auth.dropbox.callback');
+Route::post('/auth/dropbox/disconnect', [AuthController::class, 'disconnectDropbox'])->name('auth.dropbox.disconnect')->middleware('auth');
+
 // Subscription routes
 Route::get('/pricing', [SubscriptionController::class, 'pricing'])->name('subscription.pricing');
 Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])->name('subscription.subscribe')->middleware('auth');

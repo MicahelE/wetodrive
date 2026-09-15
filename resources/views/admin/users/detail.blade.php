@@ -262,6 +262,7 @@
             <thead>
                 <tr>
                     <th>Date</th>
+                    <th>Saved to</th>
                     <th>Files</th>
                     <th>Total Size</th>
                 </tr>
@@ -278,6 +279,7 @@
                         <td style="white-space: nowrap; vertical-align: top;">
                             {{ \Carbon\Carbon::parse($group->transferred_at)->format('M j, Y H:i') }}
                         </td>
+                        <td style="white-space: nowrap; vertical-align: top;">{{ $group->destination === 'dropbox' ? 'Dropbox' : 'Google Drive' }}</td>
                         <td>
                             @if($many)
                                 {{-- Native disclosure: no JS to keep working. --}}
@@ -291,8 +293,8 @@
                                             <li>
                                                 {{ $file->filename ?? '—' }}
                                                 <span style="color: #6b7280;">({{ $file->formatted_file_size }})</span>
-                                                @if($file->google_drive_id)
-                                                    <a href="https://drive.google.com/file/d/{{ $file->google_drive_id }}/view"
+                                                @if($file->viewUrl())
+                                                    <a href="{{ $file->viewUrl() }}"
                                                        target="_blank" rel="noopener">open</a>
                                                 @endif
                                             </li>
@@ -302,8 +304,8 @@
                             @else
                                 {{-- Transfers recorded before the filename column existed have none. --}}
                                 {{ $group->first_filename ?? '—' }}
-                                @if($group->google_drive_id)
-                                    <a href="https://drive.google.com/file/d/{{ $group->google_drive_id }}/view"
+                                @if($group->viewUrl())
+                                    <a href="{{ $group->viewUrl() }}"
                                        target="_blank" rel="noopener">open</a>
                                 @endif
                             @endif

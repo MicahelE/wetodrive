@@ -73,8 +73,26 @@ class StreamTransferService
         // Get WeTransfer download stream
         $downloadStream = $this->getWeTransferStream($downloadUrl, $fileInfo);
 
-        // Upload stream to Google Drive with progress tracking
-        $fileId = $this->streamToGoogleDrive($downloadStream, $fileInfo, $user, $transferId, $folderId);
+        if ($user->deliverTo === 'dropbox') {
+            // $folderId is a Dropbox path on this route; see TransferController::transfer().
+            $fileId = DropboxService::for($user)->upload(
+                StreamWrapper::getResource($downloadStream),
+                DropboxService::path($folderId, $fileInfo['filename']),
+                function (int $uploaded, int $total) use ($transferId, $fileInfo) {
+                    if ($this->progressCallback) {
+                        call_user_func($this->progressCallback, $uploaded, $total);
+                    }
+
+                    if ($transferId) {
+                        StreamProgressController::updateProgress($transferId, $uploaded, $total, $fileInfo['filename'], 'transferring');
+                    }
+                },
+                (int) $fileInfo['size'],
+            )['path_display'];
+        } else {
+            // Upload stream to Google Drive with progress tracking
+            $fileId = $this->streamToGoogleDrive($downloadStream, $fileInfo, $user, $transferId, $folderId);
+        }
 
         Log::info('Streaming transfer completed', [
             'file_id' => $fileId,

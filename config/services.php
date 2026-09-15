@@ -57,4 +57,12 @@ return [
         'webhook_secret' => env('PAYSTACK_WEBHOOK_SECRET'),
     ],
 
+    // Unset hides every Dropbox control, which is how production stays on Drive
+    // only while the Dropbox app is in development mode.
+    'dropbox' => [
+        'client_id' => env('DROPBOX_CLIENT_ID'),
+        'client_secret' => env('DROPBOX_CLIENT_SECRET'),
+        'redirect' => env('DROPBOX_REDIRECT_URI'),
+    ],
+
 ];

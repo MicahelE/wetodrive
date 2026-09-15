@@ -3,13 +3,13 @@
 
 Hi {{ $user->name }},
 
-Your file has been successfully transferred to Google Drive.
+Your file has been successfully transferred to {{ $destination }}.
 
 - **File:** {{ $filename }}
 - **Size:** {{ $fileSize }}
 
 <x-mail::button :url="$googleDriveUrl">
-View in Google Drive
+View in {{ $destination }}
 </x-mail::button>
 
 Thanks,<br>

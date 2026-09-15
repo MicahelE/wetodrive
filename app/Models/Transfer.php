@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Services\DropboxService;
 
 class Transfer extends Model
 {
@@ -15,6 +16,7 @@ class Transfer extends Model
         'filename',
         'file_size',
         'google_drive_id',
+        'destination',
         'transferred_at',
     ];
 
@@ -24,6 +26,21 @@ class Transfer extends Model
             'transferred_at' => 'datetime',
             'file_size' => 'integer',
         ];
+    }
+
+    /**
+     * Where to open what landed. For Dropbox, google_drive_id holds the file's
+     * path, and dropbox.com has no page for one file, so it opens the folder.
+     */
+    public function viewUrl(): ?string
+    {
+        if (blank($this->google_drive_id)) {
+            return null;
+        }
+
+        return $this->destination === 'dropbox'
+            ? DropboxService::webUrl(dirname($this->google_drive_id))
+            : "https://drive.google.com/file/d/{$this->google_drive_id}/view";
     }
 
     public function user()

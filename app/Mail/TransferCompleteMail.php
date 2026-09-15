@@ -26,6 +26,9 @@ class TransferCompleteMail extends Mailable
 
     public function content(): Content
     {
-        return new Content(markdown: 'emails.transfer-complete');
+        return new Content(markdown: 'emails.transfer-complete', with: [
+            // Read off the link rather than passed in, so no caller has to change.
+            'destination' => str_contains($this->googleDriveUrl, 'dropbox.com') ? 'Dropbox' : 'Google Drive',
+        ]);
     }
 }

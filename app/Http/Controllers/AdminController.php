@@ -101,6 +101,8 @@ class AdminController extends Controller
             ->selectRaw('MAX(transferred_at) as transferred_at')
             ->selectRaw('MIN(filename) as first_filename')
             ->selectRaw('MAX(google_drive_id) as google_drive_id')
+            // One link goes to one place, so every file in a batch agrees.
+            ->selectRaw('MAX(destination) as destination')
             ->groupBy('group_key')
             ->orderByRaw('MAX(transferred_at) DESC')
             ->paginate(15);

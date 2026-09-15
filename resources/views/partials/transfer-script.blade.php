@@ -255,6 +255,7 @@
             }
 
             setUpDriveBrowser();
+            setUpDestination();
 
             // A transfer outlives the tab that started it, so if the server says
             // one is still running (or finished within the last 15 minutes), drop
@@ -350,6 +351,32 @@
         // this transfer depends on which of the two happened first.
         let startedHere = false;
 
+        // The progress stream does not carry the destination, so it is read off
+        // the form. Only a transfer reattached after a reload can get it wrong,
+        // and then only in the wording.
+        function destinationLabel() {
+            const picked = document.getElementById('destination');
+            return picked && picked.value === 'dropbox' ? 'Dropbox' : 'Google Drive';
+        }
+
+        // Dropbox is addressed by path, so the Drive picker, and any folder id
+        // already picked with it, mean nothing there.
+        function setUpDestination() {
+            const picked = document.getElementById('destination');
+            if (!picked) return; // only the Dropbox page carries a destination
+
+            const sync = function () {
+                const browse = document.getElementById('browseDrive');
+                const folderId = document.getElementById('destination_folder_id');
+                if (browse) browse.hidden = picked.value === 'dropbox';
+                if (folderId && picked.value === 'dropbox') folderId.value = '';
+                document.getElementById('transferButton').textContent = 'Transfer to ' + destinationLabel();
+            };
+
+            picked.addEventListener('change', sync);
+            sync();
+        }
+
         function startProgressMonitoring(transferId) {
             currentTransferId = transferId;
             let reconnectAttempts = 0;
@@ -398,14 +425,15 @@
                             // Build success message with Google Drive link
                             const files = data.files || [];
                             const many = files.length > 1;
+                            const dest = data.destination || 'Google Drive';
 
                             let successHtml = `
                                 <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px;">
                                     <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Transfer Successful!</div>
                                     <div style="margin-bottom: 10px;">${
                                         many
-                                            ? `${files.length} files have been transferred to Google Drive, each one on its own.`
-                                            : 'Your file has been transferred to Google Drive.'
+                                            ? `${files.length} files have been transferred to ${dest}, each one on its own.`
+                                            : `Your file has been transferred to ${dest}.`
                                     }</div>`;
 
                             // Individual files, so they can be opened directly rather
@@ -416,7 +444,7 @@
                                 files.forEach(function (f) {
                                     const name = document.createElement('span');
                                     name.textContent = f.filename;
-                                    successHtml += `<li><a href="https://drive.google.com/file/d/${encodeURIComponent(f.google_drive_id)}/view" target="_blank" rel="noopener" style="color:#155724;">${name.innerHTML}</a></li>`;
+                                    successHtml += `<li><a href="${f.url || 'https://drive.google.com/file/d/' + encodeURIComponent(f.google_drive_id) + '/view'}" target="_blank" rel="noopener" style="color:#155724;">${name.innerHTML}</a></li>`;
                                 });
                                 successHtml += '</ul>';
                             }
@@ -434,13 +462,13 @@
                                 successHtml += `
                                     <a href="${data.folder_url}" target="_blank" rel="noopener"
                                        style="display: inline-block; background: #4285f4; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-bottom: 10px;">
-                                        Open folder in Google Drive
+                                        Open folder in ${dest}
                                     </a><br>`;
-                            } else if (data.google_drive_id) {
+                            } else if (data.url || data.google_drive_id) {
                                 successHtml += `
-                                    <a href="https://drive.google.com/file/d/${data.google_drive_id}/view" target="_blank"
+                                    <a href="${data.url || 'https://drive.google.com/file/d/' + data.google_drive_id + '/view'}" target="_blank"
                                        style="display: inline-block; background: #4285f4; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-bottom: 10px;">
-                                        View in Google Drive
+                                        View in ${dest}
                                     </a><br>`;
                             }
 
@@ -452,8 +480,9 @@
 
                             // Offer to pass the same link on. Free accounts get one
                             // share ever, so someone who uses it and wants another
-                            // lands on the plans page by themselves.
-                            successHtml += `
+                            // lands on the plans page by themselves. A share lands in
+                            // the recipient's Drive, so a Dropbox transfer offers none.
+                            if (dest !== 'Dropbox') successHtml += `
                                 <div style="background: #f8f9fa; border: 1px solid #e9ecef; color: #212529; padding: 15px; border-radius: 8px; margin-top: 12px;">
                                     <div style="font-weight: 600; margin-bottom: 6px;">Working on this with someone?</div>
                                     <div style="margin-bottom: 12px;">Send them the same link and it lands in their Google Drive too, on your plan's limits rather than theirs.</div>
@@ -561,7 +590,7 @@
                         document.getElementById('completionMessage').innerHTML = `
                             <div style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 15px; border-radius: 8px;">
                                 <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Connection Lost</div>
-                                <div style="margin-bottom: 10px;">Lost connection to the server. Your transfer may still be completing in the background. Check your Google Drive in a few minutes.</div>
+                                <div style="margin-bottom: 10px;">Lost connection to the server. Your transfer may still be completing in the background. Check your ${destinationLabel()} in a few minutes.</div>
                                 <button onclick="resetTransferForm()" style="background: #ffc107; color: #212529; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
                                     Start New Transfer
                                 </button>
@@ -640,9 +669,9 @@
             if (data.status === 'downloading') {
                 document.getElementById('progressStatus').textContent = 'Downloading from WeTransfer...';
             } else if (data.status === 'uploading') {
-                document.getElementById('progressStatus').textContent = 'Uploading to Google Drive...';
+                document.getElementById('progressStatus').textContent = 'Uploading to ' + destinationLabel() + '...';
             } else if (data.status === 'transferring') {
-                document.getElementById('progressStatus').textContent = 'Transferring to Google Drive...';
+                document.getElementById('progressStatus').textContent = 'Transferring to ' + destinationLabel() + '...';
                 document.getElementById('statusMessage').innerHTML = '<span>⏳ Transfer in progress... Please wait.</span>';
             } else if (data.status === 'completed') {
                 document.getElementById('progressStatus').textContent = 'Transfer Complete!';
@@ -659,7 +688,7 @@
                 document.getElementById('completionMessage').innerHTML = `
                     <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px;">
                         <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">✅ Transfer Successful!</div>
-                        <div style="margin-bottom: 10px;">Your file has been transferred to Google Drive.</div>
+                        <div style="margin-bottom: 10px;">Your file has been transferred to ${destinationLabel()}.</div>
                         <button onclick="resetTransferForm()" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
                             Transfer Another File
                         </button>

@@ -193,18 +193,30 @@ class StreamProgressController extends Controller
      * — so the progress key is what actually decides. Returns null once there is
      * nothing left to show, which is what keeps a stale id off the homepage.
      */
-    public static function markActiveTransfer(int $userId, string $transferId): void
+    public static function markActiveTransfer(int $userId, string $transferId, string $destination = 'drive'): void
     {
         Cache::put("active_transfer_{$userId}", $transferId, self::POINTER_TTL);
+        Cache::put("transfer_destination_{$transferId}", $destination, self::POINTER_TTL);
     }
 
-    public static function activeTransferFor(int $userId): ?string
+    /**
+     * $destination narrows this to transfers headed there, so the Drive homepage
+     * and the Dropbox page each reattach only to their own. Null means any.
+     */
+    public static function activeTransferFor(int $userId, ?string $destination = null): ?string
     {
         $transferId = Cache::get("active_transfer_{$userId}");
 
-        return $transferId && Cache::has("transfer_progress_{$transferId}")
-            ? $transferId
-            : null;
+        if (! $transferId || ! Cache::has("transfer_progress_{$transferId}")) {
+            return null;
+        }
+
+        // Pointers set before destinations were recorded were all Drive.
+        if ($destination !== null && Cache::get("transfer_destination_{$transferId}", 'drive') !== $destination) {
+            return null;
+        }
+
+        return $transferId;
     }
 
     /**
