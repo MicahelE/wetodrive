@@ -340,6 +340,8 @@
                 <a href="{{ route('seo.free') }}">Free Plan Guide</a>
                 <a href="{{ route('seo.alternative') }}">WeTransfer Alternative</a>
                 <a href="{{ route('seo.google-drive-guide') }}">Save to Google Drive</a>
+                <a href="{{ route('seo.vs-google-drive') }}">WeTransfer vs Google Drive</a>
+                <a href="{{ route('seo.vs-dropbox') }}">WeTransfer vs Dropbox</a>
             </div>
             <div class="footer-section">
                 <h4>Support</h4>

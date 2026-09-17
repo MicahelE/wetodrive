@@ -27,6 +27,8 @@ class HomepageTest extends TestCase
         '/wetransfer-free'        => 'Free Plan Guide',
         '/wetransfer-alternative' => 'WeTransfer Alternative',
         '/save-to-google-drive'   => 'Save to Google Drive',
+        '/wetransfer-vs-google-drive' => 'WeTransfer vs Google Drive',
+        '/wetransfer-vs-dropbox'  => 'WeTransfer vs Dropbox',
     ];
 
     /** Keyword copy carried over from the pre-redesign homepage. */

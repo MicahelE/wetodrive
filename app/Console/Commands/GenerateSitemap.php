@@ -69,6 +69,18 @@ class GenerateSitemap extends Command
                 'changefreq' => 'weekly',
                 'priority' => '0.9'
             ],
+            [
+                'url' => $baseUrl . '/wetransfer-vs-google-drive',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'monthly',
+                'priority' => '0.8'
+            ],
+            [
+                'url' => $baseUrl . '/wetransfer-vs-dropbox',
+                'lastmod' => now()->format('Y-m-d'),
+                'changefreq' => 'monthly',
+                'priority' => '0.8'
+            ],
             // Only where the page exists; it 404s until Dropbox is configured.
             ...(config('services.dropbox.client_id') ? [[
                 'url' => $baseUrl . '/dropbox',

@@ -53,6 +53,8 @@ Route::get('/wetransfer-upload', [SeoController::class, 'upload'])->name('seo.up
 Route::get('/wetransfer-free', [SeoController::class, 'free'])->name('seo.free');
 Route::get('/wetransfer-alternative', [SeoController::class, 'alternative'])->name('seo.alternative');
 Route::get('/save-to-google-drive', [SeoController::class, 'googleDriveGuide'])->name('seo.google-drive-guide');
+Route::get('/wetransfer-vs-google-drive', [SeoController::class, 'compare'])->defaults('page', 'google-drive')->name('seo.vs-google-drive');
+Route::get('/wetransfer-vs-dropbox', [SeoController::class, 'compare'])->defaults('page', 'dropbox')->name('seo.vs-dropbox');
 
 // Support Pages
 Route::get('/help', [SupportController::class, 'help'])->name('support.help');

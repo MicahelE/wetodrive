@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Support\ComparisonPages;
 
 class SeoController extends Controller
 {
@@ -76,5 +77,11 @@ class SeoController extends Controller
         ];
 
         return view('seo.google-drive-guide', compact('metaData'));
+    }
+
+    /** The "WeTransfer vs ..." pages. $page comes from the route's defaults. */
+    public function compare(string $page)
+    {
+        return view('seo.compare', ['page' => ComparisonPages::for($page)]);
     }
 }

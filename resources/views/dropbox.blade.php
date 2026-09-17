@@ -10,7 +10,7 @@
         ['How big a file can I move?', 'Your WetoDrive plan sets the limit, the same as for Google Drive, and your Dropbox needs the free space for it. The pricing page lists what each plan allows.'],
         ['Can I close the tab while it runs?', 'Yes. The transfer runs on our servers, so you can close the tab or shut your laptop. We email you when the files are in your Dropbox, and this page shows the result if you come back.'],
         ['Do you keep a copy of my files?', 'No. Files over 1GB stream from WeTransfer to Dropbox without being stored on our servers. Smaller files pass through a temporary copy that is deleted as soon as the upload finishes.'],
-        ['Does it work with expired or password-protected links?', 'No. WeTransfer links stop working once they expire, which is usually after 7 days, and password-protected transfers cannot be opened. Ask the sender for a fresh link.'],
+        ['Does it work with expired or password-protected links?', 'No. WeTransfer links stop working once they expire, which is after a few days on the free plan, and password-protected transfers cannot be opened. Ask the sender for a fresh link.'],
         ['How do I disconnect Dropbox?', 'Use the Disconnect Dropbox button on this page. It revokes our access at Dropbox and deletes the stored token. You can also remove WetoDrive under Connected apps in your Dropbox settings.'],
     ];
 
