@@ -78,6 +78,6 @@
 </table>
 
 <div style="margin-top: 20px;">
-    {{ $users->links() }}
+    {{ $users->links('pagination::default') }}
 </div>
 @endsection

@@ -65,6 +65,6 @@
 </table>
 
 <div style="margin-top: 20px;">
-    {{ $subscriptions->links() }}
+    {{ $subscriptions->links('pagination::default') }}
 </div>
 @endsection

@@ -318,7 +318,7 @@
             </tbody>
         </table>
         <div style="margin-top: 15px;">
-            {{ $transfers->links() }}
+            {{ $transfers->links('pagination::default') }}
         </div>
     @else
         <p>No transfer history</p>

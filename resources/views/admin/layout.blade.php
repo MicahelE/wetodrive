@@ -356,6 +356,35 @@
             margin-top: 20px;
         }
 
+        /* No Tailwind here, so admin lists use the plain pagination::default view */
+        .pagination {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            list-style: none;
+            margin: 20px 0;
+        }
+
+        .pagination .page-item > * {
+            display: block;
+            padding: 6px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: white;
+            color: #2c3e50;
+            text-decoration: none;
+        }
+
+        .pagination .page-item.active > * {
+            background: #2c3e50;
+            border-color: #2c3e50;
+            color: white;
+        }
+
+        .pagination .page-item.disabled > * {
+            color: #adb5bd;
+        }
+
         @media (max-width: 768px) {
             .footer {
                 margin-left: 0;

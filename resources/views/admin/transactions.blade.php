@@ -64,6 +64,6 @@
 </table>
 
 <div style="margin-top: 20px;">
-    {{ $transactions->links() }}
+    {{ $transactions->links('pagination::default') }}
 </div>
 @endsection
